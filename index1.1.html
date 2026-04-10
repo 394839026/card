@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TCG卡牌管理系统 - 线上多账号版</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+:root { --primary: #4361ee; --card-bg: #fff; --body-bg: #f8f9fc; --text: #21252d; }
+.dark-mode { --primary: #8ab4f8; --card-bg: #1e1e2e; --body-bg: #121212; --text: #e9ecef; }
+body { background: var(--body-bg); color: var(--text); transition: 0.3s; }
+.card { background: var(--card-bg) !important; border: 0; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+.btn-primary { background: var(--primary) !important; border: 0; }
+.searchResultItem { padding: 6px 10px; cursor: pointer; border-bottom: 1px solid #ddd; }
+.searchResultItem:hover { background: #f0f0f0; }
+.dark-mode .searchResultItem { border-color: #444; }
+.dark-mode .searchResultItem:hover { background: #333; }
+.card-img-preview { width:100%; height:160px; object-fit:cover; border-radius:8px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="container py-4">
+  <!-- 登录注册 -->
+  <div id="authBox" class="card p-4 mx-auto mt-5" style="max-width:420px">
+    <h3 class="text-center mb-3">TCG 卡牌管理系统</h3>
+    <input class="form-control mb-2" id="username" placeholder="用户名">
+    <input class="form-control mb-2" id="password" type="password" placeholder="密码">
+    <button class="btn btn-primary w-100 mb-2" onclick="userLogin()">登录</button>
+    <button class="btn btn-outline-secondary w-100" onclick="userRegister()">注册</button>
+    <div class="mt-2 text-center small text-muted">每人独立账号，数据互不通用</div>
+  </div>
+
+  <!-- 主界面 -->
+  <div id="mainBox" class="d-none">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2><i class="bi bi-collection"></i> 卡牌库存管理</h2>
+      <div class="d-flex gap-3 align-items-center">
+        <div class="form-check form-switch">
+          <input class="form-check-input" type="checkbox" id="hideZeroStock">
+          <label class="form-check-label">库存0隐藏</label>
+        </div>
+        <button id="darkBtn" class="btn btn-sm btn-secondary"><i class="bi bi-moon"></i></button>
+        <button class="btn btn-sm btn-danger" onclick="userLogout()">退出登录</button>
+      </div>
+    </div>
+
+    <input class="form-control mb-3" id="globalSearch" placeholder="搜索卡牌名称、版本、稀有度、代卖人" oninput="doSearch()">
+
+    <div class="mb-4 flex-wrap d-flex gap-2">
+      <button class="btn btn-primary" onclick="showPage('cards')">卡牌列表</button>
+      <button class="btn btn-primary" onclick="showPage('trades')">交易记录</button>
+      <button class="btn btn-primary" onclick="showPage('dashboard')">仓库总览</button>
+      <button class="btn btn-primary" onclick="showPage('board')">内部看板</button>
+      <button class="btn btn-primary" onclick="showPage('addCard')">添加卡牌</button>
+      <button class="btn btn-primary" onclick="showPage('bulkBuy')">批量买入</button>
+      <button class="btn btn-primary" onclick="showPage('bulkSell')">批量卖出</button>
+      <button class="btn btn-primary" onclick="showPage('profit')">收益统计</button>
+      <button class="btn btn-success" onclick="exportExcel()">导出Excel</button>
+      <button class="btn btn-warning" onclick="importExcel()">导入Excel</button>
+    </div>
+
+    <!-- 卡牌列表 -->
+    <div id="cards" class="page">
+      <div class="row g-3" id="cardGrid"></div>
+    </div>
+
+    <!-- 交易记录 -->
+    <div id="trades" class="page d-none">
+      <div class="card p-3"><div class="table-responsive"><table class="table"><thead><tr><th>ID</th><th>卡牌</th><th>归属</th><th>类型</th><th>金额</th><th>对象</th><th>日期</th></tr></thead><tbody id="tradeTable"></tbody></table></div></div>
+    </div>
+
+    <!-- 仓库总览 -->
+    <div id="dashboard" class="page d-none">
+      <div class="card p-4">
+        <h5>仓库总价值</h5>
+        <div class="row text-center mt-3">
+          <div class="col-4"><div class="p-3 bg-primary bg-opacity-10 rounded"><h6>总数量</h6><h3 id="totalCount">0</h3></div></div>
+          <div class="col-4"><div class="p-3 bg-success bg-opacity-10 rounded"><h6>总市场价</h6><h3 id="totalPrice">0</h3></div></div>
+          <div class="col-4"><div class="p-3 bg-warning bg-opacity-10 rounded"><h6>总成本价</h6><h3 id="totalActual">0</h3></div></div>
+        </div>
+        <button class="btn btn-primary w-100 mt-3" onclick="refreshDashboard()">刷新</button>
+      </div>
+    </div>
+
+    <!-- 内部看板 -->
+    <div id="board" class="page d-none">
+      <div class="card p-4"><h5>内部资金</h5><div class="table-responsive"><table class="table table-sm"><thead><tr><th>人员</th><th>应付</th><th>应收</th><th>净额</th></tr></thead><tbody id="boardBody"></tbody></table></div></div>
+    </div>
+
+    <!-- 添加卡牌 -->
+    <div id="addCard" class="page d-none">
+      <div class="card p-4">
+        <input class="form-control mb-2" id="cName" placeholder="名称">
+        <input class="form-control mb-2" id="cSet" placeholder="版本">
+        <input class="form-control mb-2" id="cRare" placeholder="稀有度">
+        <input class="form-control mb-2" id="cQty" type="number" placeholder="数量">
+        <input class="form-control mb-2" id="cPrice" placeholder="市场价">
+        <input class="form-control mb-2" id="cActual" placeholder="成本价">
+        <select class="form-control mb-2" id="cOwnerType"><option value="自有">自有</option><option value="代卖">代卖</option></select>
+        <input class="form-control mb-2" id="cOwnerName" placeholder="代卖人">
+        <textarea class="form-control mb-2" id="cEffect" rows="3" placeholder="卡牌效果"></textarea>
+        <button class="btn btn-primary w-100" onclick="addCard()">保存卡牌</button>
+      </div>
+    </div>
+
+    <!-- 批量买入 -->
+    <div id="bulkBuy" class="page d-none">
+      <div class="card p-4">
+        <h5>批量买入</h5>
+        <input class="form-control mb-2" id="bulkTarget" placeholder="交易对象">
+        <input class="form-control mb-2" type="date" id="bulkDate">
+        <div id="bulkBuyList"><div class="d-flex gap-2 mb-2">
+          <div class="flex-grow-1 position-relative"><input class="form-control" placeholder="搜索卡牌" oninput="searchCard(this,0,'buy')"><div class="position-absolute w-100 bg-white shadow d-none" id="buySearchResult0"></div><input type="hidden" id="bId0"></div>
+          <input class="form-control flex-grow-1" type="number" value="1" id="bQty0">
+          <input class="form-control flex-grow-1" type="number" id="bPrice0">
+          <button class="btn btn-danger btn-sm" onclick="removeBulkLine(this)">×</button>
+        </div></div>
+        <button class="btn btn-secondary mb-2" onclick="addBulkBuyLine()">+ 添加一行</button>
+        <button class="btn btn-primary w-100" onclick="saveBulkBuy()">确认买入</button>
+      </div>
+    </div>
+
+    <!-- 批量卖出 -->
+    <div id="bulkSell" class="page d-none">
+      <div class="card p-4">
+        <h5>批量卖出</h5>
+        <input class="form-control mb-2" id="bulkSellTarget" placeholder="交易对象">
+        <input class="form-control mb-2" type="date" id="bulkSellDate">
+        <div id="bulkSellList"><div class="d-flex gap-2 mb-2">
+          <div class="flex-grow-1 position-relative"><input class="form-control" placeholder="搜索卡牌" oninput="searchCard(this,0,'sell')"><div class="position-absolute w-100 bg-white shadow d-none" id="sellSearchResult0"></div><input type="hidden" id="sId0"></div>
+          <input class="form-control flex-grow-1" type="number" value="1" id="sQty0">
+          <input class="form-control flex-grow-1" type="number" id="sPrice0">
+          <button class="btn btn-danger btn-sm" onclick="removeBulkSellLine(this)">×</button>
+        </div></div>
+        <button class="btn btn-secondary mb-2" onclick="addBulkSellLine()">+ 添加一行</button>
+        <button class="btn btn-primary w-100" onclick="saveBulkSell()">确认卖出</button>
+      </div>
+    </div>
+
+    <!-- 收益统计 -->
+    <div id="profit" class="page d-none">
+      <div class="card p-4">
+        <input class="form-control mb-2" type="date" id="sDate">
+        <input class="form-control mb-2" type="date" id="eDate">
+        <button class="btn btn-primary w-100 mb-3" onclick="calcProfit()">统计收益</button>
+        <div id="profitResult" class="p-3 bg-light rounded"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ==============================================
+// 多用户账号系统（每人独立数据）
+// ==============================================
+let currentUser = null;
+
+function userRegister() {
+  const name = document.getElementById('username').value.trim();
+  const pwd = document.getElementById('password').value.trim();
+  if (!name || !pwd) return alert('请输入用户名和密码');
+  if (localStorage.getItem('TCG_USER_' + name)) return alert('用户名已存在');
+  const userData = { pwd, cards: [], trades: [] };
+  localStorage.setItem('TCG_USER_' + name, JSON.stringify(userData));
+  alert('注册成功！请登录');
+}
+
+function userLogin() {
+  const name = document.getElementById('username').value.trim();
+  const pwd = document.getElementById('password').value.trim();
+  const data = localStorage.getItem('TCG_USER_' + name);
+  if (!data) return alert('用户不存在');
+  const user = JSON.parse(data);
+  if (user.pwd !== pwd) return alert('密码错误');
+  currentUser = name;
+  loadUserDB();
+  document.getElementById('authBox').classList.add('d-none');
+  document.getElementById('mainBox').classList.remove('d-none');
+  showPage('cards');
+}
+
+function userLogout() {
+  currentUser = null;
+  location.reload();
+}
+
+// 加载/保存当前用户库
+let db = { cards: [], trades: [] };
+function loadUserDB() {
+  const u = JSON.parse(localStorage.getItem('TCG_USER_' + currentUser));
+  db.cards = u.cards || [];
+  db.trades = u.trades || [];
+}
+function saveUserDB() {
+  const u = JSON.parse(localStorage.getItem('TCG_USER_' + currentUser));
+  u.cards = db.cards;
+  u.trades = db.trades;
+  localStorage.setItem('TCG_USER_' + currentUser, JSON.stringify(u));
+}
+
+// ==============================================
+// 暗黑模式
+// ==============================================
+let dark = localStorage.getItem('dark') === '1';
+if (dark) document.body.classList.add('dark-mode');
+document.getElementById('darkBtn').onclick = () => {
+  dark = !dark;
+  document.body.classList.toggle('dark-mode');
+  localStorage.setItem('dark', dark ? '1' : '0');
+};
+
+// ==============================================
+// 全局搜索 & 页面切换
+// ==============================================
+let currentSearch = '';
+function doSearch() {
+  currentSearch = document.getElementById('globalSearch').value.toLowerCase();
+  if (!document.getElementById('cards').classList.contains('d-none')) loadCards();
+}
+
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.add('d-none'));
+  document.getElementById(id).classList.remove('d-none');
+  if (id === 'cards') loadCards();
+  if (id === 'trades') loadTrades();
+  if (id === 'board') buildBoard();
+  if (id === 'dashboard') refreshDashboard();
+}
+
+function isHideZero() {
+  return document.getElementById('hideZeroStock').checked;
+}
+document.getElementById('hideZeroStock').addEventListener('change', () => showPage('cards'));
+
+// ==============================================
+// 卡牌列表渲染
+// ==============================================
+function loadCards() {
+  const g = document.getElementById('cardGrid');
+  g.innerHTML = '';
+  const hide = isHideZero();
+  db.cards.forEach((c, idx) => {
+    if (hide && c.qty <= 0) return;
+    const txt = (c.name + c.set + c.rarity + (c.ownerName || '')).toLowerCase();
+    if (currentSearch && !txt.includes(currentSearch)) return;
+    const own = c.ownerType === '自有'
+      ? '<span class="badge bg-success">自有</span>'
+      : '<span class="badge bg-warning text-dark">代卖</span>';
+    g.innerHTML += `
+    <div class="col-md-6 col-lg-3">
+      <div class="card p-3 h-100">
+        <div class="d-flex justify-content-between mt-1"><small>ID:${idx+1}</small>${own}</div>
+        <h6 class="mt-1">${c.name}</h6>
+        <small class="text-muted">${c.set || ''} ${c.rarity || ''}</small>
+        <div>库存：${c.qty}</div>
+        <div>市场价：${c.price}</div>
+        <div class="text-primary">成本：${c.actual}</div>
+        <div class="mt-1">代卖人：${c.ownerName || '-'}</div>
+        <div class="d-flex gap-2 mt-2">
+          <button class="btn btn-sm btn-warning flex-1" onclick="editCard(${idx})">修改</button>
+          <button class="btn btn-sm btn-danger flex-1" onclick="delCard(${idx})">删除</button>
+        </div>
+      </div>
+    </div>`;
+  });
+}
+
+// ==============================================
+// 添加 / 修改 / 删除
+// ==============================================
+function addCard() {
+  const card = {
+    name: document.getElementById('cName').value.trim(),
+    set: document.getElementById('cSet').value.trim(),
+    rarity: document.getElementById('cRare').value.trim(),
+    qty: +document.getElementById('cQty').value || 0,
+    price: +document.getElementById('cPrice').value || 0,
+    actual: +document.getElementById('cActual').value || 0,
+    ownerType: document.getElementById('cOwnerType').value,
+    ownerName: document.getElementById('cOwnerName').value.trim(),
+    effect: document.getElementById('cEffect').value.trim(),
+    image: ''
+  };
+  if (!card.name) return alert('请输入名称');
+  db.cards.push(card);
+  saveUserDB();
+  alert('保存成功');
+  showPage('cards');
+}
+
+function editCard(idx) {
+  const c = db.cards[idx];
+  document.getElementById('cName').value = c.name;
+  document.getElementById('cSet').value = c.set || '';
+  document.getElementById('cRare').value = c.rarity || '';
+  document.getElementById('cQty').value = c.qty;
+  document.getElementById('cPrice').value = c.price;
+  document.getElementById('cActual').value = c.actual;
+  document.getElementById('cOwnerType').value = c.ownerType || '自有';
+  document.getElementById('cOwnerName').value = c.ownerName || '';
+  document.getElementById('cEffect').value = c.effect || '';
+  showPage('addCard');
+  setTimeout(() => db.cards.splice(idx, 1), 0);
+}
+
+function delCard(idx) {
+  if (!confirm('确定删除？')) return;
+  db.cards.splice(idx, 1);
+  saveUserDB();
+  loadCards();
+}
+
+// ==============================================
+// 仓库总览
+// ==============================================
+function refreshDashboard() {
+  let tc = 0, tp = 0, ta = 0;
+  db.cards.forEach(c => {
+    const q = c.qty || 0;
+    tc += q;
+    tp += q * (c.price || 0);
+    ta += q * (c.actual || 0);
+  });
+  document.getElementById('totalCount').innerText = tc;
+  document.getElementById('totalPrice').innerText = tp.toFixed(2);
+  document.getElementById('totalActual').innerText = ta.toFixed(2);
+}
+
+// ==============================================
+// 交易记录 & 内部看板
+// ==============================================
+function loadTrades() {
+  const t = document.getElementById('tradeTable');
+  t.innerHTML = '';
+  db.trades.forEach((tr, i) => {
+    const name = tr.cid ? (db.cards[tr.cid-1]?.name || '已删除') : '-';
+    const own = tr.cid ? (db.cards[tr.cid-1]?.ownerType || '-') : '-';
+    t.innerHTML += `<tr><td>${i+1}</td><td>${name}</td><td>${own}</td><td>${tr.type}</td><td>${tr.total}</td><td>${tr.target}</td><td>${tr.date}</td></tr>`;
+  });
+}
+
+function buildBoard() {
+  const b = document.getElementById('boardBody');
+  b.innerHTML = '';
+  const map = {};
+  db.trades.forEach(t => {
+    if (t.type !== '内部交易') return;
+    const k = t.target.trim();
+    if (!map[k]) map[k] = { pay: 0, rec: 0 };
+    t.total > 0 ? map[k].pay += t.total : map[k].rec -= t.total;
+  });
+  for (let k in map) {
+    b.innerHTML += `<tr><td>${k}</td><td>${map[k].pay.toFixed(2)}</td><td>${map[k].rec.toFixed(2)}</td><td>${(map[k].rec - map[k].pay).toFixed(2)}</td></tr>`;
+  }
+}
+
+// ==============================================
+// 批量买入 / 卖出
+// ==============================================
+let bLine = 1, sLine = 1;
+function addBulkBuyLine() { bLine++; const d = document.createElement('div'); d.className = 'd-flex gap-2 mb-2';
+d.innerHTML = `<div class="flex-grow-1 position-relative"><input class="form-control" oninput="searchCard(this,${bLine},'buy')"><div class="position-absolute w-100 bg-white shadow d-none" id="buySearchResult${bLine}"></div><input type="hidden" id="bId${bLine}"></div><input class="form-control flex-grow-1" type="number" value="1" id="bQty${bLine}"><input class="form-control flex-grow-1" type="number" id="bPrice${bLine}"><button class="btn btn-danger btn-sm" onclick="removeBulkLine(this)">×</button>`;
+document.getElementById('bulkBuyList').appendChild(d); }
+function removeBulkLine(e) { e.parentElement.remove(); }
+
+function saveBulkBuy() {
+  const tg = document.getElementById('bulkTarget').value.trim();
+  const dt = document.getElementById('bulkDate').value;
+  if (!tg || !dt) return alert('请完善信息');
+  document.querySelectorAll('#bulkBuyList > div').forEach((_, i) => {
+    const id = +document.getElementById(`bId${i}`).value;
+    const q = +document.getElementById(`bQty${i}`).value || 1;
+    const pr = +document.getElementById(`bPrice${i}`).value || 0;
+    if (!id || !db.cards[id-1]) return;
+    db.cards[id-1].qty += q;
+    db.trades.push({ cid: id, type: '买入', qty: q, total: q*pr, date: dt, target: tg });
+  });
+  saveUserDB(); alert('买入完成'); showPage('cards');
+}
+
+function addBulkSellLine() { sLine++; const d = document.createElement('div'); d.className = 'd-flex gap-2 mb-2';
+d.innerHTML = `<div class="flex-grow-1 position-relative"><input class="form-control" oninput="searchCard(this,${sLine},'sell')"><div class="position-absolute w-100 bg-white shadow d-none" id="sellSearchResult${sLine}"></div><input type="hidden" id="sId${sLine}"></div><input class="form-control flex-grow-1" type="number" value="1" id="sQty${sLine}"><input class="form-control flex-grow-1" type="number" id="sPrice${sLine}"><button class="btn btn-danger btn-sm" onclick="removeBulkSellLine(this)">×</button>`;
+document.getElementById('bulkSellList').appendChild(d); }
+function removeBulkSellLine(e) { e.parentElement.remove(); }
+
+function saveBulkSell() {
+  const tg = document.getElementById('bulkSellTarget').value.trim();
+  const dt = document.getElementById('bulkSellDate').value;
+  if (!tg || !dt) return alert('请完善信息');
+  document.querySelectorAll('#bulkSellList > div').forEach((_, i) => {
+    const id = +document.getElementById(`sId${i}`).value;
+    const q = +document.getElementById(`sQty${i}`).value || 1;
+    const pr = +document.getElementById(`sPrice${i}`).value || 0;
+    if (!id || !db.cards[id-1] || db.cards[id-1].qty < q) return;
+    db.cards[id-1].qty -= q;
+    db.trades.push({ cid: id, type: '卖出', qty: q, total: q*pr, date: dt, target: tg });
+  });
+  saveUserDB(); alert('卖出完成'); showPage('cards');
+}
+
+// ==============================================
+// 收益统计
+// ==============================================
+function calcProfit() {
+  const s = new Date(document.getElementById('sDate').value);
+  const e = new Date(document.getElementById('eDate').value);
+  let buy = 0, sell = 0;
+  db.trades.forEach(t => {
+    const d = new Date(t.date);
+    if (d >= s && d <= e) {
+      t.type === '买入' ? (buy += t.total) : (t.type === '卖出' && (sell += t.total));
+    }
+  });
+  document.getElementById('profitResult').innerHTML = `买入：${buy.toFixed(2)}<br>卖出：${sell.toFixed(2)}<br>利润：${(sell - buy).toFixed(2)}`;
+}
+
+// ==============================================
+// 搜索卡牌
+// ==============================================
+function searchCard(input, idx, type) {
+  const kw = input.value.toLowerCase();
+  const box = document.getElementById(`${type}SearchResult${idx}`);
+  if (!kw) { box.classList.add('d-none'); return; }
+  box.innerHTML = '';
+  const list = db.cards.filter(c => (c.name + c.set).toLowerCase().includes(kw)).slice(0, 8);
+  list.forEach(c => {
+    const d = document.createElement('div');
+    d.className = 'searchResultItem';
+    d.innerText = c.name + ' ' + (c.set || '');
+    d.onclick = () => {
+      document.getElementById(`${type==='buy'?'bId':'sId'}${idx}`).value = db.cards.indexOf(c)+1;
+      input.value = d.innerText;
+      box.classList.add('d-none');
+    };
+    box.appendChild(d);
+  });
+  box.classList.remove('d-none');
+}
+
+// ==============================================
+// 导入 / 导出 Excel
+// ==============================================
+function importExcel() {
+  const inp = document.createElement('input');
+  inp.type = 'file';
+  inp.accept = '.xlsx,.xls';
+  inp.onchange = e => {
+    const r = new FileReader();
+    r.onload = ev => {
+      const wb = XLSX.read(ev.target.result, { type: 'array' });
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+      data.forEach(row => {
+        const name = (row['名称'] || '').trim();
+        const setN = (row['版本'] || '').trim();
+        const rare = (row['稀有度'] || '').trim();
+        if (!name) return;
+        const ex = db.cards.findIndex(x =>
+          x.name === name && (x.set || '') === setN && (x.rarity || '') === rare
+        );
+        const item = {
+          name, set: setN, rarity: rare,
+          qty: row['库存'] || 0,
+          price: row['市场价'] || 0,
+          actual: row['成本价'] || 0,
+          ownerType: row['归属'] || '自有',
+          ownerName: row['代卖人'] || '',
+          effect: '', image: ''
+        };
+        ex >= 0 ? db.cards[ex] = item : db.cards.push(item);
+      });
+      saveUserDB();
+      alert('导入并覆盖完成！');
+      loadCards();
+    };
+    r.readAsArrayBuffer(e.target.files[0]);
+  };
+  inp.click();
+}
+
+function exportExcel() {
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.cards), '卡牌');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.trades), '交易');
+  XLSX.writeFile(wb, 'TCG卡牌数据.xlsx');
+}
+</script>
+</body>
+</html>
