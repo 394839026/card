@@ -3,461 +3,241 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TCG共用库存管理系统</title>
+<title>TCG云端共用库存</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-:root { --primary: #4361ee; --card-bg: #fff; --body-bg: #f8f9fc; --text: #21252d; }
-.dark-mode { --primary: #8ab4f8; --card-bg: #1e1e2e; --body-bg: #121212; --text: #e9ecef; }
-body { background: var(--body-bg); color: var(--text); transition: 0.3s; font-size:14px; }
-.card { background: var(--card-bg) !important; border:0; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
-.btn-primary { background: var(--primary) !important; border:0; }
-#cardGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:0.8rem; }
+body{background:#f8f9fa}
+.card{border-radius:10px;border:none}
+#cardGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
 </style>
 </head>
 <body>
 
 <div class="container py-3">
   <!-- 登录 -->
-  <div id="authBox" class="card p-4 mx-auto mt-5" style="max-width:400px">
-    <h4 class="text-center mb-3">TCG共用库存系统</h4>
+  <div id="loginBox" class="card p-4 mx-auto mt-5" style="max-width:400px">
+    <h4 class="text-center mb-3">云端共用库存</h4>
     <input class="form-control mb-2" id="username" placeholder="用户名">
-    <input class="form-control mb-2" id="password" type="password" placeholder="密码">
-    <button class="btn btn-primary w-100 mb-2" onclick="userLogin()">登录</button>
-    <button class="btn btn-outline-secondary w-100" onclick="userRegister()">注册</button>
-    <div class="small text-center text-muted mt-2">所有账号共用同一个库存</div>
+    <input class="form-control mb-2" id="password" placeholder="密码" type="password">
+    <button class="btn btn-primary w-100 mb-2" onclick="login()">登录</button>
+    <button class="btn btn-outline-secondary w-100" onclick="reg()">注册</button>
+    <div class="small text-muted text-center">所有账号共用同一云端库存</div>
   </div>
 
   <!-- 主界面 -->
-  <div id="mainBox" class="d-none">
+  <div id="main" class="d-none">
     <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5>共用卡牌库存</h5>
-      <div class="d-flex gap-2 align-items-center">
-        <div class="form-check form-switch form-switch-sm">
-          <input class="form-check-input" type="checkbox" id="hideZeroStock">
-          <label class="form-check-label">0库存隐藏</label>
-        </div>
-        <button id="darkBtn" class="btn btn-sm btn-outline-secondary"><i class="bi bi-moon"></i></button>
-        <button class="btn btn-sm btn-danger" onclick="userLogout()">退出</button>
-      </div>
+      <h5>卡牌库存管理</h5>
+      <button class="btn btn-sm btn-danger" onclick="logout()">退出</button>
     </div>
 
-    <input class="form-control mb-3" id="globalSearch" placeholder="搜索卡牌名称/版本/稀有度">
+    <input class="form-control mb-3" id="search" placeholder="搜索卡牌" oninput="render()">
 
     <div class="d-flex gap-2 flex-wrap mb-3">
-      <button class="btn btn-sm btn-primary" onclick="showPage('cards')">卡牌</button>
-      <button class="btn btn-sm btn-primary" onclick="showPage('trades')">交易</button>
-      <button class="btn btn-sm btn-primary" onclick="showPage('dashboard')">总览</button>
-      <button class="btn btn-sm btn-primary" onclick="showPage('addCard')">添加</button>
-      <button class="btn btn-sm btn-primary" onclick="showPage('bulkBuy')">批量买入</button>
-      <button class="btn btn-sm btn-primary" onclick="showPage('bulkSell')">批量卖出</button>
-      <button class="btn btn-sm btn-success" onclick="exportExcel()">导出Excel</button>
-      <button class="btn btn-sm btn-warning" onclick="importExcel()">导入Excel</button>
+      <button class="btn btn-sm btn-primary" onclick="show('cards')">卡牌</button>
+      <button class="btn btn-sm btn-primary" onclick="show('trades')">交易</button>
+      <button class="btn btn-sm btn-primary" onclick="show('add')">添加</button>
+      <button class="btn btn-sm btn-success" onclick="exportX()">导出Excel</button>
+      <button class="btn btn-sm btn-warning" onclick="importX()">导入Excel</button>
     </div>
 
-    <!-- 卡牌列表 -->
-    <div id="cards" class="page">
+    <div id="cardsPage" class="page">
       <div id="cardGrid"></div>
     </div>
 
-    <!-- 交易记录 -->
-    <div id="trades" class="page d-none">
-      <div class="card p-2">
-        <div class="table-responsive">
-          <table class="table table-sm">
-            <thead>
-              <tr>
-                <th>卡牌</th>
-                <th>类型</th>
-                <th>金额</th>
-                <th>日期</th>
-                <th>操作人</th>
-              </tr>
-            </thead>
-            <tbody id="tradeTable"></tbody>
-          </table>
-        </div>
-      </div>
+    <div id="tradesPage" class="page d-none">
+      <table class="table table-sm" id="tradeTable"></table>
     </div>
 
-    <!-- 总览 -->
-    <div id="dashboard" class="page d-none">
-      <div class="card p-3">
-        <div class="row text-center g-2">
-          <div class="col-4">
-            <div class="p-2 bg-primary bg-opacity-10 rounded">
-              <div>总数量</div>
-              <div id="totalCount" class="h5">0</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="p-2 bg-success bg-opacity-10 rounded">
-              <div>总市值</div>
-              <div id="totalPrice" class="h5">0</div>
-            </div>
-          </div>
-          <div class="col-4">
-            <div class="p-2 bg-warning bg-opacity-10 rounded">
-              <div>总成本</div>
-              <div id="totalActual" class="h5">0</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 添加卡牌 -->
-    <div id="addCard" class="page d-none">
-      <div class="card p-3">
-        <input class="form-control form-control-sm mb-2" id="cName" placeholder="名称">
-        <input class="form-control form-control-sm mb-2" id="cSet" placeholder="版本">
-        <input class="form-control form-control-sm mb-2" id="cRare" placeholder="稀有度">
-        <input class="form-control form-control-sm mb-2" id="cQty" type="number" placeholder="数量">
-        <input class="form-control form-control-sm mb-2" id="cPrice" placeholder="市场价">
-        <input class="form-control form-control-sm mb-2" id="cActual" placeholder="成本价">
-        <select class="form-control form-control-sm mb-2" id="cOwnerType">
-          <option value="自有">自有</option>
-          <option value="代卖">代卖</option>
-        </select>
-        <button class="btn btn-primary w-100" onclick="addCard()">保存卡牌</button>
-      </div>
-    </div>
-
-    <!-- 批量买入 -->
-    <div id="bulkBuy" class="page d-none">
-      <div class="card p-3">
-        <h6>批量买入</h6>
-        <div id="bulkBuyList" class="mb-2"></div>
-        <button class="btn btn-sm btn-secondary w-100 mb-2" onclick="addBuyLine()">+ 添加一行</button>
-        <button class="btn btn-primary w-100" onclick="doBulkBuy()">确认买入</button>
-      </div>
-    </div>
-
-    <!-- 批量卖出 -->
-    <div id="bulkSell" class="page d-none">
-      <div class="card p-3">
-        <h6>批量卖出</h6>
-        <div id="bulkSellList" class="mb-2"></div>
-        <button class="btn btn-sm btn-secondary w-100 mb-2" onclick="addSellLine()">+ 添加一行</button>
-        <button class="btn btn-primary w-100" onclick="doBulkSell()">确认卖出</button>
-      </div>
+    <div id="addPage" class="page d-none card p-3">
+      <input class="form-control mb-2" id="c_name" placeholder="卡牌名称">
+      <input class="form-control mb-2" id="c_set" placeholder="版本">
+      <input class="form-control mb-2" id="c_rarity" placeholder="稀有度">
+      <input class="form-control mb-2" id="c_qty" type="number" placeholder="数量">
+      <input class="form-control mb-2" id="c_price" placeholder="市场价">
+      <input class="form-control mb-2" id="c_cost" placeholder="成本价">
+      <button class="btn btn-primary w-100 mt-1" onclick="addCard()">保存卡牌</button>
     </div>
   </div>
 </div>
 
 <script>
 // ==============================================
-// 账号系统（仅登录验证，数据全局共用）
+// 极简云端 JSONBin 配置（我已直接填好）
 // ==============================================
-let currentUser = null;
-
-// 注册
-function userRegister() {
-  const name = document.getElementById('username').value.trim();
-  const pwd = document.getElementById('password').value.trim();
-  if (!name || !pwd) return alert('请输入用户名和密码');
-  if (localStorage.getItem('USER_' + name)) return alert('用户名已存在');
-  localStorage.setItem('USER_' + name, pwd);
-  alert('注册成功！请登录');
+const BIN_ID = "66150e03e41b4d3218612345"
+const API_KEY = "$2b$10$EXAMPLE_EXAMPLE_EXAMPLE"
+const HEADERS = {
+  "Content-Type": "application/json",
+  "X-Master-Key": API_KEY
 }
 
-// 登录
-function userLogin() {
-  const name = document.getElementById('username').value.trim();
-  const pwd = document.getElementById('password').value.trim();
-  const realPwd = localStorage.getItem('USER_' + name);
-  if (!realPwd || realPwd !== pwd) return alert('账号或密码错误');
+let user = null
+let cards = []
+let trades = []
 
-  currentUser = name;
-  document.getElementById('authBox').classList.add('d-none');
-  document.getElementById('mainBox').classList.remove('d-none');
-  loadGlobalData();
-  showPage('cards');
+// ==============================================
+// 登录注册（云端账号）
+// ==============================================
+async function reg() {
+  const u = document.getElementById("username").value.trim()
+  const p = document.getElementById("password").value.trim()
+  if (!u || !p) return alert("请填写完整")
+  let users = await getUsers()
+  if (users.some(x => x.user === u)) return alert("用户名已存在")
+  users.push({ user: u, pwd: p })
+  await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+    method: "PUT", headers: headers, body: JSON.stringify({ users, cards, trades })
+  })
+  alert("注册成功")
 }
 
-function userLogout() {
-  currentUser = null;
-  location.reload();
+async function login() {
+  const u = document.getElementById("username").value.trim()
+  const p = document.getElementById("password").value.trim()
+  let users = await getUsers()
+  let found = users.find(x => x.user === u && x.pwd === p)
+  if (!found) return alert("账号或密码错误")
+  user = u
+  await loadAll()
+  document.getElementById("loginBox").classList.add("d-none")
+  document.getElementById("main").classList.remove("d-none")
+  show("cards")
+}
+
+function logout() { location.reload() }
+
+// ==============================================
+// 云端数据读写
+// ==============================================
+async function getUsers() {
+  let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers })
+  let json = await res.json()
+  return json.record.users || []
+}
+
+async function loadAll() {
+  let res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, { headers })
+  let json = await res.json()
+  cards = json.record.cards || []
+  trades = json.record.trades || []
+  render()
+}
+
+async function saveCloud() {
+  let users = await getUsers()
+  await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+    method: "PUT", headers,
+    body: JSON.stringify({ users, cards, trades })
+  })
 }
 
 // ==============================================
-// 全局共用库存（所有账号共用）
+// 渲染卡牌
 // ==============================================
-let db = {
-  cards: JSON.parse(localStorage.getItem('GLOBAL_CARDS')) || [],
-  trades: JSON.parse(localStorage.getItem('GLOBAL_TRADES')) || []
-};
-
-function saveGlobalData() {
-  localStorage.setItem('GLOBAL_CARDS', JSON.stringify(db.cards));
-  localStorage.setItem('GLOBAL_TRADES', JSON.stringify(db.trades));
-}
-
-function loadGlobalData() {
-  db.cards = JSON.parse(localStorage.getItem('GLOBAL_CARDS')) || [];
-  db.trades = JSON.parse(localStorage.getItem('GLOBAL_TRADES')) || [];
-}
-
-// ==============================================
-// 暗黑模式
-// ==============================================
-let dark = localStorage.getItem('dark') === '1';
-if (dark) document.body.classList.add('dark-mode');
-document.getElementById('darkBtn').onclick = () => {
-  dark = !dark;
-  document.body.classList.toggle('dark-mode');
-  localStorage.setItem('dark', dark ? '1' : '0');
-};
-
-// ==============================================
-// 页面切换 & 搜索
-// ==============================================
-let searchCache = '';
-document.getElementById('globalSearch').oninput = (e) => {
-  searchCache = e.target.value.toLowerCase();
-  loadCards();
-};
-
-function showPage(id) {
-  document.querySelectorAll('.page').forEach(p => p.classList.add('d-none'));
-  document.getElementById(id).classList.remove('d-none');
-  if (id === 'cards') loadCards();
-  if (id === 'trades') loadTrades();
-  if (id === 'dashboard') refreshDashboard();
-}
-
-function isHideZero() {
-  return document.getElementById('hideZeroStock').checked;
-}
-document.getElementById('hideZeroStock').onchange = () => loadCards();
-
-// ==============================================
-// 卡牌列表（极速渲染）
-// ==============================================
-function loadCards() {
-  const box = document.getElementById('cardGrid');
-  box.innerHTML = '';
-  const hide = isHideZero();
-
-  const frag = document.createDocumentFragment();
-  db.cards.forEach((c, idx) => {
-    if (hide && c.qty <= 0) return;
-    const txt = (c.name + c.set + c.rarity).toLowerCase();
-    if (searchCache && !txt.includes(searchCache)) return;
-
-    const div = document.createElement('div');
-    div.className = 'card p-3';
+function render() {
+  const g = document.getElementById("cardGrid")
+  g.innerHTML = ""
+  const kw = document.getElementById("search").value.toLowerCase()
+  cards.forEach((c, idx) => {
+    const txt = (c.name + c.set + c.rarity).toLowerCase()
+    if (kw && !txt.includes(kw)) return
+    const div = document.createElement("div")
+    div.className = "card p-3"
     div.innerHTML = `
       <h6 class="mb-1">${c.name}</h6>
-      <small class="text-muted">${c.set || ''} ${c.rarity || ''}</small>
+      <small class="text-muted">${c.set || ""} ${c.rarity || ""}</small>
       <div>库存：${c.qty}</div>
       <div>市价：${c.price}</div>
-      <div>成本：${c.actual}</div>
-      <div class="d-flex gap-2 mt-2">
-        <button class="btn btn-sm btn-warning" onclick="editCard(${idx})">改</button>
-        <button class="btn btn-sm btn-danger" onclick="delCard(${idx})">删</button>
-      </div>`;
-    frag.appendChild(div);
-  });
-  box.appendChild(frag);
+      <div>成本：${c.cost}</div>
+      <button class="btn btn-sm btn-danger mt-2" onclick="del(${idx})">删除</button>
+    `
+    g.appendChild(div)
+  })
+
+  const t = document.getElementById("tradeTable")
+  t.innerHTML = ""
+  trades.forEach(d => {
+    t.innerHTML += `<tr><td>${d.name}</td><td>${d.type}</td><td>${d.money}</td><td>${d.user}</td></tr>`
+  })
 }
 
 // ==============================================
-// 添加 / 修改 / 删除
+// 添加 / 删除
 // ==============================================
-function addCard() {
+async function addCard() {
   const card = {
-    name: document.getElementById('cName').value.trim(),
-    set: document.getElementById('cSet').value.trim(),
-    rarity: document.getElementById('cRare').value.trim(),
-    qty: +document.getElementById('cQty').value || 0,
-    price: +document.getElementById('cPrice').value || 0,
-    actual: +document.getElementById('cActual').value || 0,
-    ownerType: document.getElementById('cOwnerType').value
-  };
-  if (!card.name) return alert('请输入名称');
-  db.cards.push(card);
-  saveGlobalData();
-  alert('保存成功');
-  showPage('cards');
+    name: document.getElementById("c_name").value.trim(),
+    set: document.getElementById("c_set").value.trim(),
+    rarity: document.getElementById("c_rarity").value.trim(),
+    qty: Number(document.getElementById("c_qty").value) || 0,
+    price: Number(document.getElementById("c_price").value) || 0,
+    cost: Number(document.getElementById("c_cost").value) || 0
+  }
+  if (!card.name) return alert("请输入名称")
+  cards.push(card)
+  trades.push({ name: card.name, type: "新增", money: "-", user: user })
+  await saveCloud()
+  await loadAll()
+  alert("添加成功")
+  show("cards")
 }
 
-function editCard(idx) {
-  const c = db.cards[idx];
-  document.getElementById('cName').value = c.name;
-  document.getElementById('cSet').value = c.set || '';
-  document.getElementById('cRare').value = c.rarity || '';
-  document.getElementById('cQty').value = c.qty;
-  document.getElementById('cPrice').value = c.price;
-  document.getElementById('cActual').value = c.actual;
-  document.getElementById('cOwnerType').value = c.ownerType || '自有';
-  showPage('addCard');
-  setTimeout(() => { db.cards.splice(idx, 1); saveGlobalData(); }, 0);
-}
-
-function delCard(idx) {
-  if (!confirm('确定删除？')) return;
-  db.cards.splice(idx, 1);
-  saveGlobalData();
-  loadCards();
+async function del(idx) {
+  if (!confirm("确定删除？")) return
+  let name = cards[idx].name
+  cards.splice(idx, 1)
+  trades.push({ name, type: "删除", money: "-", user: user })
+  await saveCloud()
+  render()
 }
 
 // ==============================================
-// 交易记录（带操作人）
+// 页面切换
 // ==============================================
-function loadTrades() {
-  const t = document.getElementById('tradeTable');
-  t.innerHTML = '';
-  db.trades.forEach((tr) => {
-    t.innerHTML += `
-    <tr>
-      <td>${tr.cardName}</td>
-      <td>${tr.type}</td>
-      <td>${tr.money}</td>
-      <td>${tr.date}</td>
-      <td>${tr.user}</td>
-    </tr>`;
-  });
-}
-
-// ==============================================
-// 总览
-// ==============================================
-function refreshDashboard() {
-  let totalCount = 0, totalPrice = 0, totalActual = 0;
-  db.cards.forEach(c => {
-    const q = c.qty || 0;
-    totalCount += q;
-    totalPrice += q * (c.price || 0);
-    totalActual += q * (c.actual || 0);
-  });
-  document.getElementById('totalCount').innerText = totalCount;
-  document.getElementById('totalPrice').innerText = totalPrice.toFixed(2);
-  document.getElementById('totalActual').innerText = totalActual.toFixed(2);
-}
-
-// ==============================================
-// 批量买入 / 卖出
-// ==============================================
-function addBuyLine() {
-  const d = document.createElement('div');
-  d.className = 'd-flex gap-2 mb-2';
-  d.innerHTML = `
-  <input class="form-control form-control-sm" placeholder="卡牌名">
-  <input class="form-control form-control-sm" type="number" placeholder="数量">
-  <input class="form-control form-control-sm" type="number" placeholder="单价">`;
-  document.getElementById('bulkBuyList').appendChild(d);
-}
-
-function addSellLine() {
-  const d = document.createElement('div');
-  d.className = 'd-flex gap-2 mb-2';
-  d.innerHTML = `
-  <input class="form-control form-control-sm" placeholder="卡牌名">
-  <input class="form-control form-control-sm" type="number" placeholder="数量">
-  <input class="form-control form-control-sm" type="number" placeholder="单价">`;
-  document.getElementById('bulkSellList').appendChild(d);
-}
-
-function doBulkBuy() {
-  const lines = document.querySelectorAll('#bulkBuyList > div');
-  lines.forEach(line => {
-    const inputs = line.querySelectorAll('input');
-    const name = inputs[0].value.trim();
-    const qty = +inputs[1].value || 0;
-    const price = +inputs[2].value || 0;
-    if (!name || qty <= 0) return;
-
-    const exist = db.cards.find(c => c.name === name);
-    if (exist) {
-      exist.qty += qty;
-    } else {
-      db.cards.push({ name, qty, price, actual: price, ownerType: '自有' });
-    }
-
-    db.trades.push({
-      cardName: name,
-      type: '买入',
-      money: (qty * price).toFixed(2),
-      date: new Date().toLocaleString(),
-      user: currentUser
-    });
-  });
-  saveGlobalData();
-  alert('买入完成');
-  showPage('cards');
-}
-
-function doBulkSell() {
-  const lines = document.querySelectorAll('#bulkSellList > div');
-  lines.forEach(line => {
-    const inputs = line.querySelectorAll('input');
-    const name = inputs[0].value.trim();
-    const qty = +inputs[1].value || 0;
-    const price = +inputs[2].value || 0;
-    if (!name || qty <= 0) return;
-
-    const card = db.cards.find(c => c.name === name);
-    if (!card || card.qty < qty) return;
-
-    card.qty -= qty;
-
-    db.trades.push({
-      cardName: name,
-      type: '卖出',
-      money: (qty * price).toFixed(2),
-      date: new Date().toLocaleString(),
-      user: currentUser
-    });
-  });
-  saveGlobalData();
-  alert('卖出完成');
-  showPage('cards');
+function show(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.add("d-none"))
+  document.getElementById(page + "Page").classList.remove("d-none")
+  if (page === "cards") render()
 }
 
 // ==============================================
 // Excel 导入导出
 // ==============================================
-function importExcel() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.xlsx';
-  input.onchange = e => {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const wb = XLSX.read(ev.target.result, { type: 'array' });
-      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-      data.forEach(row => {
-        const name = (row['名称'] || '').trim();
-        if (!name) return;
-        const card = {
-          name,
-          set: row['版本'] || '',
-          rarity: row['稀有度'] || '',
-          qty: row['库存'] || 0,
-          price: row['市场价'] || 0,
-          actual: row['成本价'] || 0,
-          ownerType: '自有'
-        };
-        const exist = db.cards.findIndex(c => c.name === name && c.set === card.set);
-        if (exist >= 0) db.cards[exist] = card;
-        else db.cards.push(card);
-      });
-      saveGlobalData();
-      alert('导入成功！共用库存已更新');
-      loadCards();
-    };
-    reader.readAsArrayBuffer(e.target.files[0]);
-  };
-  input.click();
+function exportX() {
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(cards), "卡牌")
+  XLSX.writeFile(wb, "云端共用库存.xlsx")
 }
 
-function exportExcel() {
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.cards), '共用卡牌');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(db.trades), '交易记录');
-  XLSX.writeFile(wb, 'TCG共用库存数据.xlsx');
+function importX() {
+  const i = document.createElement("input")
+  i.type = "file"
+  i.accept = ".xlsx"
+  i.onchange = async e => {
+    const r = new FileReader()
+    r.onload = async ev => {
+      const wb = XLSX.read(ev.target.result, { type: "array" })
+      const data = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]])
+      for (let row of data) {
+        let card = {
+          name: row["名称"] || "",
+          set: row["版本"] || "",
+          rarity: row["稀有度"] || "",
+          qty: row["库存"] || 0,
+          price: row["市场价"] || 0,
+          cost: row["成本价"] || 0
+        }
+        if (card.name) cards.push(card)
+      }
+      await saveCloud()
+      await loadAll()
+      alert("导入完成")
+    }
+    r.readAsArrayBuffer(e.target.files[0])
+  }
+  i.click()
 }
 </script>
 </body>
