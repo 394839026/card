@@ -127,7 +127,19 @@ document.getElementById('darkBtn').onclick=()=>{dark=!dark;document.body.classLi
 let searchCache='';
 document.getElementById('globalSearch').oninput=e=>{searchCache=e.target.value.toLowerCase();loadCards();};
 
-function showPage(id){document.querySelectorAll('.page').forEach(p=>p.classList.add('d-none'));document.getElementById(id).classList.remove('d-none');if(id==='cards')loadCards();if(id==='trades')loadTrades();if(id==='dashboard')refreshDashboard();if(id==='stockInOut'){loadGlobalData();document.getElementById('inOutList').innerHTML='';addInOutLine();}}
+function showPage(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.add('d-none'));
+  document.getElementById(id).classList.remove('d-none');
+  if(id==='cards')loadCards();
+  if(id==='trades')loadTrades();
+  if(id==='dashboard')refreshDashboard();
+  // 关键：进入出入库强制重载最新数据
+  if(id==='stockInOut'){
+    loadGlobalData(); 
+    document.getElementById('inOutList').innerHTML='';
+    addInOutLine();
+  }
+}
 function isHideZero(){return document.getElementById('hideZeroStock').checked;}
 document.getElementById('hideZeroStock').onchange=()=>loadCards();
 
@@ -154,7 +166,7 @@ function delCard(i){if(!confirm('确定删除？'))return;db.cards.splice(i,1);s
 function loadTrades(){const t=document.getElementById('tradeTable');t.innerHTML='';db.trades.forEach(r=>{t.innerHTML+=`<tr><td>${r.cardCode||''}</td><td>${r.cardName}</td><td>${r.type}</td><td>${r.money}</td><td>${r.date}</td><td>${r.user}</td></tr>`;});}
 function refreshDashboard(){let tc=0,tp=0,ta=0;db.cards.forEach(c=>{const q=Number(c.qty)||0;tc+=q;tp+=q*(Number(c.price)||0);ta+=q*(Number(c.actual)||0);});document.getElementById('totalCount').innerText=tc;document.getElementById('totalPrice').innerText=tp.toFixed(2);document.getElementById('totalActual').innerText=ta.toFixed(2);}
 
-// ==== 出入库 + 下拉提示框（修复匹配逻辑）====
+// ==== 出入库 + 下拉提示框（彻底修复匹配逻辑）====
 function addInOutLine(){const w=document.getElementById('inOutList');const l=document.createElement('div');l.className='in-row';l.innerHTML=`
 <select class="form-select form-select-sm io-type"></select>
 <div class="position-relative"><input class="form-control form-control-sm io-key" placeholder="输入编号/名称" oninput="showIoSuggest(this)"><div class="io-suggest auto-box d-none"></div></div>
@@ -165,20 +177,49 @@ function addInOutLine(){const w=document.getElementById('inOutList');const l=doc
 <button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">×</button>`;
 const s=l.querySelector('.io-type');s.innerHTML=`<option value="买入">买入</option><option value="卖出">卖出</option>`;w.appendChild(l);}
 
-// 修复：去空格+小写匹配
-function showIoSuggest(input){const v=input.value.trim().toLowerCase();const row=input.closest('.position-relative').parentElement;const sug=input.parentElement.querySelector('.io-suggest');if(!v){sug.classList.add('d-none');return;}// 去所有空格再匹配const list=db.cards.filter(x=>{const c=(x.code||'').replace(/\s+/g,'').toLowerCase();const n=(x.name||'').replace(/\s+/g,'').toLowerCase();return c.includes(v)||n.includes(v);});if(list.length===0){sug.classList.add('d-none');return;}sug.classList.remove('d-none');sug.innerHTML='';list.forEach(x=>{const d=document.createElement('div');d.className='autocomplete-item';d.innerText=(x.code||'无')+' | '+x.name+' | 库存:'+x.qty;d.onclick=()=>{input.value=x.code||x.name;fillIoLine(row,x);sug.classList.add('d-none');};sug.appendChild(d);});}
+// 终极修复：去所有空格+小写匹配
+function showIoSuggest(input){
+  const raw=input.value;
+  const v=raw.replace(/\s+/g,'').toLowerCase(); // 全去空格+小写
+  const row=input.closest('.position-relative').parentElement;
+  const sug=input.parentElement.querySelector('.io-suggest');
+  if(!v){sug.classList.add('d-none');return;}
+  // 对每张卡同样清洗再匹配
+  const list=db.cards.filter(x=>{
+    const c=(x.code||'').replace(/\s+/g,'').toLowerCase();
+    const n=(x.name||'').replace(/\s+/g,'').toLowerCase();
+    return c.includes(v)||n.includes(v);
+  });
+  if(list.length===0){sug.classList.add('d-none');return;}
+  sug.classList.remove('d-none');
+  sug.innerHTML='';
+  list.forEach(x=>{
+    const d=document.createElement('div');
+    d.className='autocomplete-item';
+    d.innerText=(x.code||'无')+' | '+x.name+' | 库存:'+x.qty;
+    d.onclick=()=>{
+      input.value=x.code||x.name;
+      fillIoLine(row,x);
+      sug.classList.add('d-none');
+    };
+    sug.appendChild(d);
+  });
+}
 
-function fillIoLine(row,card){row.querySelector('.io-name').value=card.name;row.querySelector('.io-stock').value=card.qty;}
+function fillIoLine(row,card){
+  row.querySelector('.io-name').value=card.name;
+  row.querySelector('.io-stock').value=card.qty;
+}
 
 function doStockInOut(){const lines=document.querySelectorAll('#inOutList .in-row');let ok=true;lines.forEach(l=>{const t=l.querySelector('.io-type').value;const k=l.querySelector('.io-key').value.trim().toLowerCase();const n=l.querySelector('.io-name').value.trim();const q=parseInt(l.querySelector('.io-qty').value)||0;const p=parseFloat(l.querySelector('.io-price').value)||0;if(!n||q<=0){ok=false;return;}const card=db.cards.find(x=>{const c=(x.code||'').toLowerCase(),n=x.name.toLowerCase();return c===k||n===k||c.includes(k)||n.includes(k);});if(!card){if(t==='买入'){const nc={code:'',name:n,set:'',rarity:'',qty:q,price:0,actual:p,ownerType:'自有'};db.cards.push(nc);db.trades.push({cardCode:'',cardName:n,type:'买入',money:(q*p).toFixed(2),date:new Date().toLocaleString(),user:currentUser});}else{alert(`卡牌【${n}】不存在，无法卖出`);ok=false;}return;}if(t==='卖出'){if(card.qty<q){alert(`【${card.name}】库存不足！当前：${card.qty}`);ok=false;return;}card.qty-=q;}else{card.qty+=q;card.actual=p;}db.trades.push({cardCode:card.code,cardName:card.name,type:t,money:(q*p).toFixed(2),date:new Date().toLocaleString(),user:currentUser});});if(!ok)return;saveGlobalData();document.getElementById('inOutList').innerHTML='';alert('出入库完成！');showPage('cards');}
 
-// ==== Excel 导入导出（彻底修复变量名BUG）====
+// ==== Excel 导入导出（终极清洗）====
 const cols=[{key:'code',title:'编号'},{key:'name',title:'名称'},{key:'set',title:'版本'},{key:'rarity',title:'稀有度'},{key:'qty',title:'库存'},{key:'price',title:'市场价'},{key:'actual',title:'成本价'},{key:'ownerType',title:'归属'}];
 function downloadEmptyTemplate(){const wb=XLSX.utils.book_new();const ws=XLSX.utils.json_to_sheet([{}]);XLSX.utils.book_append_sheet(wb,ws,'模板');XLSX.writeFile(wb,'TCG空白模板.xlsx');}
 function exportExcel(){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(db.cards.map(i=>{let r={};cols.forEach(c=>r[c.title]=i[c.key]??'');return r;})),'库存');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(db.trades),'交易');XLSX.writeFile(wb,'TCG库存数据.xlsx');}
 let importCoverMode=false;
 function openImportSelect(){importCoverMode=confirm('确定=覆盖｜取消=追加');importExcel();}
-function importExcel(){const i=document.createElement('input');i.type='file';i.accept='.xlsx';i.onchange=e=>{const r=new FileReader();r.onload=ev=>{const wb=XLSX.read(ev.target.result,{type:'array'});const ws=wb.Sheets['Sheet1'];if(!ws){alert('必须使用 Sheet1 作为工作表名！');return;}const d=XLSX.utils.sheet_to_json(ws);if(importCoverMode)db.cards=[];d.forEach(row=>{// 修复：变量名正确const name=(row['名称']||'').trim();if(!name)return;const c={code:row['编号']||'',name:name,set:row['版本']||'',rarity:row['稀有度']||'',qty:Number(row['库存'])||0,price:Number(row['市场价'])||0,actual:Number(row['成本价'])||0,ownerType:row['归属']||'自有'};const ei=db.cards.findIndex(x=>x.code===c.code||(x.name===name&&x.set===c.set));if(ei>=0)db.cards[ei]=c;else db.cards.push(c);});saveGlobalData();alert('导入成功！');loadCards();};r.readAsArrayBuffer(e.target.files[0]);};i.click();}
+function importExcel(){const i=document.createElement('input');i.type='file';i.accept='.xlsx';i.onchange=e=>{const r=new FileReader();r.onload=ev=>{const wb=XLSX.read(ev.target.result,{type:'array'});const ws=wb.Sheets['Sheet1'];if(!ws){alert('必须使用 Sheet1 作为工作表名！');return;}const d=XLSX.utils.sheet_to_json(ws);if(importCoverMode)db.cards=[];d.forEach(row=>{// 终极清洗：name 非空且去空格const name=(row['名称']||'').toString().trim().replace(/\s+/g,'');if(!name)return;const code=(row['编号']||'').toString().trim().replace(/\s+/g,'');const c={code:code,name:name,set:(row['版本']||'').toString().trim(),rarity:(row['稀有度']||'').toString().trim(),qty:Number(row['库存'])||0,price:Number(row['市场价'])||0,actual:Number(row['成本价'])||0,ownerType:(row['归属']||'自有').toString().trim()};const ei=db.cards.findIndex(x=>x.code===code||(x.name===name&&x.set===c.set));if(ei>=0)db.cards[ei]=c;else db.cards.push(c);});saveGlobalData();alert('导入成功！');loadCards();};r.readAsArrayBuffer(e.target.files[0]);};i.click();}
 </script>
 </body>
 </html>
