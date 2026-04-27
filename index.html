@@ -3,20 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TCG共用库存管理系统-最终稳定版</title>
+<title>TCG库存系统 免登录版</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-:root { --primary: #4361ee; --card-bg: #fff; --body-bg: #f8f9fc; --text: #21252d; --auto-bg:#fff; --auto-hover:#e9ecef; }
-.dark-mode { --primary: #8ab4f8; --card-bg: #1e1e2e; --body-bg: #121212; --text: #e9ecef; --auto-bg:#2d2d3f; --auto-hover:#3d3d5f; }
+:root { --primary: #4361ee; --card-bg: #fff; --body-bg: #f8f9fc; --text: #21252d; }
+.dark-mode { --primary: #8ab4f8; --card-bg: #1e1e2e; --body-bg: #121212; --text: #e9ecef; }
 body { background: var(--body-bg); color: var(--text); transition: 0.3s; font-size:14px; }
 .card { background: var(--card-bg) !important; border:0; border-radius:10px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
 .btn-primary { background: var(--primary) !important; border:0; }
 #cardGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:0.8rem; }
 .autocomplete-item { padding:6px 8px; cursor:pointer; font-size:12px; }
-.autocomplete-item:hover { background:var(--auto-hover); }
-.auto-box { position:absolute; z-index:9999; background:var(--auto-bg); color:var(--text); border:1px solid #ccc; max-height:200px; overflow:auto; width:100%; top:100%; left:0; }
+.autocomplete-item:hover { background:#e9ecef; }
+.auto-box { position:absolute; z-index:9999; background:#fff; border:1px solid #ccc; max-height:200px; overflow:auto; width:100%; top:100%; left:0; }
 .position-relative { position:relative !important; }
 .in-row { display: grid; grid-template-columns: 110px 1fr 100px 90px 90px 90px 40px; gap: 6px; align-items: center; margin-bottom: 8px; }
 @media (max-width:768px){ .in-row { grid-template-columns: 100px 1fr; gap:6px; } }
@@ -25,17 +25,7 @@ body { background: var(--body-bg); color: var(--text); transition: 0.3s; font-si
 <body>
 
 <div class="container py-3">
-  <div id="authBox" class="card p-4 mx-auto mt-5" style="max-width:400px">
-    <h4 class="text-center mb-3">TCG共用库存系统</h4>
-    <input class="form-control mb-2" id="username" placeholder="用户名">
-    <input class="form-control mb-2" id="password" type="password" placeholder="密码">
-    <button class="btn btn-primary w-100 mb-2" onclick="userLogin()">登录</button>
-    <button class="btn btn-outline-secondary w-100" onclick="userRegister()">注册</button>
-    <button class="btn btn-danger w-100 mt-2" onclick="clearAllData()">⚠️ 清空所有数据（重置用）</button>
-    <div class="small text-center text-muted mt-2">所有账号共用同一个库存</div>
-  </div>
-
-  <div id="mainBox" class="d-none">
+    <div id="mainBox">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h5>共用卡牌库存</h5>
       <div class="d-flex gap-2 align-items-center">
@@ -44,7 +34,6 @@ body { background: var(--body-bg); color: var(--text); transition: 0.3s; font-si
           <label class="form-check-label">0库存隐藏</label>
         </div>
         <button id="darkBtn" class="btn btn-sm btn-outline-secondary"><i class="bi bi-moon"></i></button>
-        <button class="btn btn-sm btn-danger" onclick="userLogout()">退出</button>
       </div>
     </div>
 
@@ -62,26 +51,22 @@ body { background: var(--body-bg); color: var(--text); transition: 0.3s; font-si
     </div>
 
     <div id="cards" class="page"><div id="cardGrid"></div></div>
-    <div id="trades" class="page d-none"><div class="card p-2"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>编号</th><th>卡牌</th><th>类型</th><th>金额</th><th>日期</th><th>操作人</th></tr></thead><tbody id="tradeTable"></tbody></table></div></div></div>
+    <div id="trades" class="page d-none"><div class="card p-2"><div class="table-responsive"><table class="table table-sm"><thead><tr><th>编号</th><th>卡牌</th><th>类型</th><th>金额</th><th>日期</th></tr></thead><tbody id="tradeTable"></tbody></table></div></div></div>
     <div id="dashboard" class="page d-none"><div class="card p-3"><div class="row text-center g-2"><div class="col-4"><div class="p-2 bg-primary bg-opacity-10 rounded"><div>总数量</div><div id="totalCount" class="h5">0</div></div></div><div class="col-4"><div class="p-2 bg-success bg-opacity-10 rounded"><div>总市值</div><div id="totalPrice" class="h5">0</div></div></div><div class="col-4"><div class="p-2 bg-warning bg-opacity-10 rounded"><div>总成本</div><div id="totalActual" class="h5">0</div></div></div></div></div></div>
     <div id="addCard" class="page d-none"><div class="card p-3 position-relative"><input class="form-control form-control-sm mb-2" id="cCode" placeholder="卡牌编号" oninput="codeAutoFill()"><div id="autoCodeList" class="auto-box d-none"></div><input class="form-control form-control-sm mb-2" id="cName" placeholder="名称"><input class="form-control form-control-sm mb-2" id="cSet" placeholder="版本"><input class="form-control form-control-sm mb-2" id="cRare" placeholder="稀有度"><input class="form-control form-control-sm mb-2" id="cQty" type="number" placeholder="数量"><input class="form-control form-control-sm mb-2" id="cPrice" placeholder="市场价"><input class="form-control form-control-sm mb-2" id="cActual" placeholder="成本价"><select class="form-control form-control-sm mb-2" id="cOwnerType"><option value="自有">自有</option><option value="代卖">代卖</option></select><input type="hidden" id="editIndex" value="-1"><button class="btn btn-primary w-100" onclick="saveCard()">保存卡牌</button></div></div>
-    <div id="stockInOut" class="page d-none"><div class="card p-3"><h6 class="mb-3">卡牌出入库（自动匹配+下拉提示）</h6><div class="fw-bold small mb-2 in-row"><span>类型</span><span>编号/名称</span><span>卡牌名</span><span>库存</span><span>数量</span><span>单价</span><span></span></div><div id="inOutList" class="mb-3"></div><button class="btn btn-sm btn-secondary w-100 mb-2" onclick="addInOutLine()">+ 添加一行</button><button class="btn btn-primary w-100" onclick="doStockInOut()">确认提交</button></div></div>
+    <div id="stockInOut" class="page d-none"><div class="card p-3"><h6 class="mb-3">卡牌出入库（自动匹配下拉）</h6><div class="fw-bold small mb-2 in-row"><span>类型</span><span>编号/名称</span><span>卡牌名</span><span>库存</span><span>数量</span><span>单价</span><span></span></div><div id="inOutList" class="mb-3"></div><button class="btn btn-sm btn-secondary w-100 mb-2" onclick="addInOutLine()">+ 添加一行</button><button class="btn btn-primary w-100" onclick="doStockInOut()">确认提交</button></div></div>
   </div>
 </div>
 
 <script>
-let currentUser = null;
-function userRegister(){const n=document.getElementById('username').value.trim(),p=document.getElementById('password').value.trim();if(!n||!p)return alert('请输入用户名和密码');if(localStorage.getItem('USER_'+n))return alert('用户名已存在');localStorage.setItem('USER_'+n,p);alert('注册成功！请登录');}
-function userLogin(){const n=document.getElementById('username').value.trim(),p=document.getElementById('password').value.trim(),rp=localStorage.getItem('USER_'+n);if(!rp||rp!==p)return alert('账号或密码错误');currentUser=n;document.getElementById('authBox').classList.add('d-none');document.getElementById('mainBox').classList.remove('d-none');loadGlobalData();showPage('cards');}
-function userLogout(){currentUser=null;location.reload();}
-function clearAllData(){if(!confirm('确定清空所有数据？此操作不可恢复！'))return;localStorage.clear();alert('已清空所有数据！');location.reload();}
-
-let db={cards:[],trades:[]};
+// 免登录 直接进系统
+let currentUser = "管理员";
+let db={cards:JSON.parse(localStorage.getItem('GLOBAL_CARDS'))||[],trades:JSON.parse(localStorage.getItem('GLOBAL_TRADES'))||[]};
 function saveGlobalData(){localStorage.setItem('GLOBAL_CARDS',JSON.stringify(db.cards));localStorage.setItem('GLOBAL_TRADES',JSON.stringify(db.trades));}
 function loadGlobalData(){db.cards=JSON.parse(localStorage.getItem('GLOBAL_CARDS'))||[];db.trades=JSON.parse(localStorage.getItem('GLOBAL_TRADES'))||[];}
 
 let dark=localStorage.getItem('dark')==='1';if(dark)document.body.classList.add('dark-mode');
-document.getElementById('darkBtn').onclick=()=>{dark=!dark;document.body.classList.toggle('dark-mode');localStorage.setItem('dark',dark?'1':'0');const i=document.querySelector('#darkBtn i');i.className=dark?'bi bi-sun':'bi bi-moon';};
+document.getElementById('darkBtn').onclick=()=>{dark=!dark;document.body.classList.toggle('dark-mode');localStorage.setItem('dark',dark?'1':'0');};
 
 let searchCache='';
 document.getElementById('globalSearch').oninput=e=>{searchCache=e.target.value.toLowerCase();loadCards();};
@@ -112,7 +97,7 @@ function saveCard(){const i=parseInt(document.getElementById('editIndex').value)
 function editCard(i){const c=db.cards[i];document.getElementById('cCode').value=c.code||'';document.getElementById('cName').value=c.name||'';document.getElementById('cSet').value=c.set||'';document.getElementById('cRare').value=c.rarity||'';document.getElementById('cQty').value=c.qty||0;document.getElementById('cPrice').value=c.price||0;document.getElementById('cActual').value=c.actual||0;document.getElementById('cOwnerType').value=c.ownerType||'自有';document.getElementById('editIndex').value=i;showPage('addCard');}
 function delCard(i){if(!confirm('确定删除？'))return;db.cards.splice(i,1);saveGlobalData();loadCards();}
 
-function loadTrades(){const t=document.getElementById('tradeTable');t.innerHTML='';db.trades.forEach(r=>{t.innerHTML+=`<tr><td>${r.cardCode||''}</td><td>${r.cardName}</td><td>${r.type}</td><td>${r.money}</td><td>${r.date}</td><td>${r.user}</td></tr>`;});}
+function loadTrades(){const t=document.getElementById('tradeTable');t.innerHTML='';db.trades.forEach(r=>{t.innerHTML+=`<tr><td>${r.cardCode||''}</td><td>${r.cardName}</td><td>${r.type}</td><td>${r.money}</td><td>${r.date}</td></tr>`;});}
 function refreshDashboard(){let tc=0,tp=0,ta=0;db.cards.forEach(c=>{const q=Number(c.qty)||0;tc+=q;tp+=q*(Number(c.price)||0);ta+=q*(Number(c.actual)||0);});document.getElementById('totalCount').innerText=tc;document.getElementById('totalPrice').innerText=tp.toFixed(2);document.getElementById('totalActual').innerText=ta.toFixed(2);}
 
 function addInOutLine(){const w=document.getElementById('inOutList');const l=document.createElement('div');l.className='in-row';l.innerHTML=`<select class="form-select form-select-sm io-type"></select><div class="position-relative"><input class="form-control form-control-sm io-key" placeholder="输入编号/名称" oninput="showIoSuggest(this)"><div class="io-suggest auto-box d-none"></div></div><input class="form-control form-control-sm io-name" readonly style="background:#f8f9fa"><input class="form-control form-control-sm io-stock" value="0" readonly style="background:#f8f9fa"><input class="form-control form-control-sm io-qty" type="number" value="1" min="1"><input class="form-control form-control-sm io-price" type="number" value="0"><button class="btn btn-sm btn-danger" onclick="this.parentElement.remove()">×</button>`;const s=l.querySelector('.io-type');s.innerHTML=`<option value="买入">买入</option><option value="卖出">卖出</option>`;w.appendChild(l);}
@@ -139,14 +124,18 @@ function showIoSuggest(input){
   });
 }
 
-function doStockInOut(){const lines=document.querySelectorAll('#inOutList .in-row');let ok=true;lines.forEach(l=>{const t=l.querySelector('.io-type').value;const k=l.querySelector('.io-key').value.trim();const n=l.querySelector('.io-name').value.trim();const q=parseInt(l.querySelector('.io-qty').value)||0;const p=parseFloat(l.querySelector('.io-price').value)||0;if(!n||q<=0){ok=false;return;}const card=db.cards.find(x=>((x.code||'').trim()===k.trim()||x.name.trim()===k.trim()));if(!card){if(t==='买入'){const nc={code:'',name:n,set:'',rarity:'',qty:q,price:0,actual:p,ownerType:'自有'};db.cards.push(nc);db.trades.push({cardCode:'',cardName:n,type:'买入',money:(q*p).toFixed(2),date:new Date().toLocaleString(),user:currentUser});}else{alert(`卡牌【${n}】不存在`);ok=false;}return;}if(t==='卖出'){if(card.qty<q){alert(`【${card.name}】库存不足`);ok=false;return;}card.qty-=q;}else{card.qty+=q;card.actual=p;}db.trades.push({cardCode:card.code,cardName:card.name,type:t,money:(q*p).toFixed(2),date:new Date().toLocaleString(),user:currentUser});});if(!ok)return;saveGlobalData();alert('出入库完成！');showPage('cards');}
+function doStockInOut(){const lines=document.querySelectorAll('#inOutList .in-row');let ok=true;lines.forEach(l=>{const t=l.querySelector('.io-type').value;const k=l.querySelector('.io-key').value.trim();const n=l.querySelector('.io-name').value.trim();const q=parseInt(l.querySelector('.io-qty').value)||0;const p=parseFloat(l.querySelector('.io-price').value)||0;if(!n||q<=0){ok=false;return;}const card=db.cards.find(x=>((x.code||'').trim()===k.trim()||x.name.trim()===k.trim()));if(!card){if(t==='买入'){const nc={code:'',name:n,set:'',rarity:'',qty:q,price:0,actual:p,ownerType:'自有'};db.cards.push(nc);db.trades.push({cardCode:'',cardName:n,type:'买入',money:(q*p).toFixed(2),date:new Date().toLocaleString()});}else{alert(`卡牌【${n}】不存在`);ok=false;}return;}if(t==='卖出'){if(card.qty<q){alert(`【${card.name}】库存不足`);ok=false;return;}card.qty-=q;}else{card.qty+=q;card.actual=p;}db.trades.push({cardCode:card.code,cardName:card.name,type:t,money:(q*p).toFixed(2),date:new Date().toLocaleString()});});if(!ok)return;saveGlobalData();alert('出入库完成！');showPage('cards');}
 
-const cols=[{key:'code',title:'编号'},{key:'name',title:'名称'},{key:'set',title:'版本'},{key:'rarity',title:'稀有度'},{key:'qty',title:'库存'},{key:'price',title:'市场价'},{key:'actual',title:'成本价'},{key:'ownerType',title:'归属'}];
-function downloadEmptyTemplate(){const wb=XLSX.utils.book_new();const ws=XLSX.utils.json_to_sheet([{}]);XLSX.utils.book_append_sheet(wb,ws,'模板');XLSX.writeFile(wb,'TCG空白模板.xlsx');}
+const cols=[{key:'code',title:'编号'},{key:'name',title:'名称'},{key:'set',title:'版本'},{key:'rarity',title:'稀有度'},{key:'qty',title:'库存'},{key:'price',title:'市场价'},{key:'actual',title:'成本价'},{key:'归属'}];
+function downloadEmptyTemplate(){const wb=XLSX.utils.book_new();const ws=XLSX.utils.json_to_sheet([{}]);XLSX.utils.book_append_sheet(wb,ws,'Template');XLSX.writeFile(wb,'TCG空白模板.xlsx');}
 function exportExcel(){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(db.cards.map(i=>{let r={};cols.forEach(c=>r[c.title]=i[c.key]??'');return r;})),'库存');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(db.trades),'交易');XLSX.writeFile(wb,'TCG库存数据.xlsx');}
 let importCoverMode=false;
 function openImportSelect(){importCoverMode=confirm('确定=覆盖｜取消=追加');importExcel();}
 function importExcel(){const i=document.createElement('input');i.type='file';i.accept='.xlsx';i.onchange=e=>{const r=new FileReader();r.onload=ev=>{const wb=XLSX.read(ev.target.result,{type:'array'});const ws=wb.Sheets['Sheet1']||wb.Sheets[wb.SheetNames[0]];const d=XLSX.utils.sheet_to_json(ws);if(importCoverMode)db.cards=[];d.forEach(row=>{const name=(row['名称']||'').trim();if(!name)return;const c={code:(row['编号']||'').trim(),name:name,set:(row['版本']||'').trim(),rarity:(row['稀有度']||'').trim(),qty:Number(row['库存'])||0,price:Number(row['市场价'])||0,actual:Number(row['成本价'])||0,ownerType:(row['归属']||'自有').trim()};const ei=db.cards.findIndex(x=>x.code===c.code||(x.name===c.name&&x.set===c.set));if(ei>=0)db.cards[ei]=c;else db.cards.push(c);});saveGlobalData();alert('导入成功！');loadCards();};r.readAsArrayBuffer(e.target.files[0]);};i.click();}
+
+// 初始化直接加载
+loadGlobalData();
+showPage('cards');
 </script>
 </body>
 </html>
