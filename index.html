@@ -2,35 +2,51 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
+<!-- viewport：确保网页在手机端正常缩放，不出现横向滚动条 -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TCG卡牌库存管理-分页流畅版</title>
+
+<!-- 引入前端UI框架 Bootstrap，用来快速做美观的按钮、表单、弹窗 -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+<!-- 引入 Excel 处理库 SheetJS (xlsx)，用于导入导出Excel文件 -->
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <style>
+/* ===============================================
+   全局CSS变量：统一管理颜色、尺寸，方便后期换肤
+   =============================================== */
 :root{
-  --main-bg:#f1f3f6;
-  --card-bg:#ffffff;
-  --primary:#409eff;
-  --text-color:#333;
-  --muted:#999;
-  --border:#e5e7eb;
+  --main-bg:#f1f3f6;      /* 页面整体背景色 */
+  --card-bg:#ffffff;      /* 卡片容器背景色 */
+  --primary:#409eff;      /* 主题主色调（蓝色） */
+  --text-color:#333;      /* 正文文字颜色 */
+  --muted:#999;           /* 次要文字、提示文字颜色 */
+  --border:#e5e7eb;       /* 边框统一颜色 */
 }
+
+/* 页面整体样式 */
 body{
   background-color: var(--main-bg);
   font-size:14px;
   color:var(--text-color);
 }
+
+/* 主卡片容器：整个系统都放在这个卡片里 */
 .main-card{
   background:var(--card-bg);
-  border-radius:16px;
-  box-shadow:0 4px 20px rgba(0,0,0,0.08);
+  border-radius:16px;       /* 圆角 */
+  box-shadow:0 4px 20px rgba(0,0,0,0.08); /* 柔和阴影 */
   border:none;
 }
+
+/* 小按钮统一样式 */
 .btn-sm{
   border-radius:8px;
   font-size:13px;
   padding:4px 12px;
 }
+
+/* 出入库页面每行的布局：使用网格布局，固定列宽 */
 .in-row{
   display:grid;
   grid-template-columns:110px 1fr 100px 90px 90px 90px 40px;
@@ -38,6 +54,8 @@ body{
   margin-bottom:10px;
   align-items:center;
 }
+
+/* 表格标题栏样式 */
 .table-header{
   background:#f5f7fa;
   padding:10px 8px;
@@ -45,6 +63,8 @@ body{
   font-weight:600;
   color:#666;
 }
+
+/* 搜索自动提示下拉框 */
 .auto-box{
   position:absolute;
   background:#fff;
@@ -53,10 +73,12 @@ body{
   border:1px solid var(--border);
   max-height:220px;
   overflow:auto;
-  z-index:9999;
+  z-index:9999;         /* 确保在最上层 */
   width:100%;
   margin-top:4px;
 }
+
+/* 下拉选项样式 */
 .autocomplete-item{
   padding:8px 12px;
   cursor:pointer;
@@ -65,8 +87,10 @@ body{
 .autocomplete-item:hover{
   background:#f0f7ff;
 }
+
 .position-relative{position:relative;}
 
+/* ========== 三种视图样式：简约列表 ========== */
 .view-list .card-item{
   background:#fafbfc;
   border-radius:12px;
@@ -79,6 +103,7 @@ body{
   box-shadow:0 2px 10px rgba(0,0,0,0.06);
 }
 
+/* ========== 卡片网格视图 ========== */
 .view-grid{
   display:grid;
   grid-template-columns:repeat(auto-fill,minmax(240px,1fr));
@@ -91,6 +116,7 @@ body{
   padding:12px;
 }
 
+/* ========== 紧凑表格视图 ========== */
 .view-table{
   width:100%;
   border-collapse:collapse;
@@ -105,6 +131,7 @@ body{
   background:#f5f7fa;
 }
 
+/* 表单输入框、下拉框样式 */
 .form-control-sm,.form-select-sm{
   border-radius:8px;
   border:1px solid #dcdfe6;
@@ -114,19 +141,26 @@ body{
   box-shadow:0 0 0 2px rgba(64,158,255,0.2);
   border-color:var(--primary);
 }
+
 .page{padding-top:10px;}
+
+/* 统计数据栏样式 */
 .stat-bar{
   background:#f5f7fa;
   border-radius:12px;
   padding:12px 16px;
   margin-bottom:16px;
 }
+
+/* 筛选栏样式 */
 .filter-bar{
   background:#f5f7fa;
   border-radius:12px;
   padding:12px 16px;
   margin-bottom:16px;
 }
+
+/* 标签样式：自留、可出、已预定等 */
 .tag-label{
   font-size:12px;
   padding:2px 6px;
@@ -140,6 +174,7 @@ body{
 .tag-lend{background:#f0f7ff;color:#1890ff;}
 .tag-wait{background:#fff7e6;color:#fa8c16;}
 
+/* 分页条样式 */
 .pagination-bar{
   display:flex;
   align-items:center;
@@ -167,11 +202,14 @@ body{
 }
 </style>
 </head>
+
 <body class="p-3">
 
+<!-- 主容器卡片：整个系统的外层包裹 -->
 <div class="card main-card p-4">
   <h5 class="mb-4 fw-bold">🎴 TCG卡牌库存管理-分页流畅版</h5>
 
+  <!-- 统计数据展示区：总种类、总张数、总市值、零库存 -->
   <div class="stat-bar row g-3 mb-4">
     <div class="col-md-3"><span class="text-muted">卡牌总种类：</span><strong id="statTotalType">0</strong></div>
     <div class="col-md-3"><span class="text-muted">卡牌总张数：</span><strong id="statTotalQty">0</strong></div>
@@ -179,6 +217,7 @@ body{
     <div class="col-md-3"><span class="text-muted">零库存数量：</span><strong id="statZeroQty">0</strong></div>
   </div>
 
+  <!-- 筛选条件区：关键词、版本、稀有度、归属、标签、库存状态 -->
   <div class="filter-bar row g-3 mb-4">
     <div class="col-md-2">
       <input class="form-control form-control-sm" id="filterKey" placeholder="关键词/编号/名称">
@@ -217,6 +256,7 @@ body{
     </div>
   </div>
 
+  <!-- 功能按钮区：页面切换、视图切换、导入导出、备份清空 -->
   <div class="d-flex gap-2 flex-wrap mb-4">
     <button class="btn btn-primary btn-sm" onclick="showPage('cards')">卡牌列表</button>
     <button class="btn btn-primary btn-sm" onclick="showPage('stockInOut')">出入库管理</button>
@@ -240,9 +280,12 @@ body{
     <button class="btn btn-danger btn-sm" onclick="clearAll()">清空所有数据</button>
   </div>
 
+  <!-- 卡牌列表展示区域：三种视图在这里渲染 -->
   <div id="cards" class="page view-list"></div>
+  <!-- 分页控件：上一页、页码、下一页 -->
   <div id="pagination" class="pagination-bar"></div>
 
+  <!-- 出入库管理页面：默认隐藏 -->
   <div id="stockInOut" class="page d-none">
     <div class="in-row table-header mb-3">
       <span>类型</span><span>编号/名称</span><span>卡牌名</span><span>当前库存</span><span>数量</span><span>单价</span><span></span>
@@ -253,6 +296,7 @@ body{
   </div>
 </div>
 
+<!-- 编辑卡牌信息弹窗：Bootstrap 模态框 -->
 <div class="modal fade" id="editModal" tabindex="-1">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
@@ -261,7 +305,7 @@ body{
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body row g-3">
-        <input type="hidden" id="editIndex">
+        <input type="hidden" id="editIndex">  <!-- 存储当前编辑的卡牌在数组中的下标 -->
         <div class="col-md-3">
           <label>编号</label>
           <input class="form-control" id="editCode">
@@ -318,23 +362,38 @@ body{
   </div>
 </div>
 
+<!-- 引入 Bootstrap 脚本，支持弹窗、折叠等交互 -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
-// ========== 核心配置：分页 + 流畅优化 ==========
-const PAGE_SIZE = 50;    // 每页50条（可自行修改）
-let currentPage = 1;     // 当前页码
+// ==============================================
+// 一、全局变量与核心配置
+// ==============================================
+const PAGE_SIZE = 50;           // 每页显示50条数据，可自由修改
+let currentPage = 1;            // 当前默认显示第1页
+
+// 本地数据库：从浏览器 localStorage 读取保存的卡牌数据
+// 如果是第一次打开，数据为空数组 []
 let db = {
   cards: JSON.parse(localStorage.getItem('TCG_CARDS')) || []
 };
-let nowImportMode = 'add';
-let currentView = 'list';
-let filterDebounceTimer = null;
-let cachedFilterList = []; // 缓存筛选结果
+
+let nowImportMode = 'add';       // 导入模式：add=增量导入，cover=覆盖导入
+let currentView = 'list';        // 当前视图：list列表 / grid网格 / table表格
+let filterDebounceTimer = null;  // 防抖搜索定时器，防止输入时频繁刷新卡顿
+let cachedFilterList = [];       // 缓存筛选后的列表，提升分页速度
+
+// 初始化编辑弹窗（Bootstrap 提供的方法）
 const editModal = new bootstrap.Modal(document.getElementById('editModal'));
 
-// 防抖筛选（解决输入卡顿）
+// ==============================================
+// 二、页面加载完成后：给筛选框绑定防抖事件
+// ==============================================
 document.addEventListener('DOMContentLoaded', ()=>{
+  // 所有筛选条件的输入框ID
   const filters = ['filterKey','filterVersion','filterRare','filterOwner','filterTag','filterStock'];
+  
+  // 遍历绑定事件：输入或改变时触发防抖筛选
   filters.forEach(id=>{
     const el = document.getElementById(id);
     el.addEventListener('input', debounceFilter);
@@ -342,42 +401,75 @@ document.addEventListener('DOMContentLoaded', ()=>{
   });
 });
 
+// ==============================================
+// 防抖筛选函数：停止输入200毫秒后才执行筛选
+// 作用：避免输入一个字就刷新一次，造成卡顿
+// ==============================================
 function debounceFilter(){
+  // 清除上一次的定时器
   clearTimeout(filterDebounceTimer);
+  
+  // 重新设置新定时器
   filterDebounceTimer = setTimeout(()=>{
-    currentPage = 1; // 筛选重置为第1页
-    renderCards();
-  }, 200);
+    currentPage = 1;          // 筛选后回到第1页
+    renderCards();           // 重新渲染卡牌列表
+  }, 200); // 200ms延迟
 }
 
+// ==============================================
+// 保存数据到浏览器本地存储（永久保存，刷新不丢失）
+// ==============================================
 function saveDB(){
+  // 把卡牌数组转为JSON字符串存入localStorage
   localStorage.setItem('TCG_CARDS', JSON.stringify(db.cards));
 }
 
+// ==============================================
+// 切换视图：列表 / 网格 / 表格
+// ==============================================
 function setView(v){
-  currentView = v;
-  renderCards();
+  currentView = v;    // 保存当前视图类型
+  renderCards();      // 重新渲染
 }
 
-// 缓存筛选下拉数据
+// ==============================================
+// 自动填充筛选下拉选项：版本、稀有度、归属
+// 只会执行一次，结果缓存起来，避免重复计算
+// ==============================================
 let cacheFilters = null;
 function fillFilterOption(){
+  // 如果已经缓存过，直接返回，不再执行
   if(cacheFilters) return;
+
+  // 使用 Set 自动去重
   let vSet = new Set(), rSet = new Set(), oSet = new Set();
+  
+  // 遍历所有卡牌，收集版本、稀有度、归属
   db.cards.forEach(c=>{
     if(c.version) vSet.add(c.version);
     if(c.rare) rSet.add(c.rare);
     if(c.owner) oSet.add(c.owner);
   });
+
+  // 缓存结果
   cacheFilters = {vSet,rSet,oSet};
 
-  document.getElementById('filterVersion').innerHTML = `<option value="">全部版本</option>${[...vSet].map(x=>`<option value="${x}">${x}</option>`).join('')}`;
-  document.getElementById('filterRare').innerHTML = `<option value="">全部稀有度</option>${[...rSet].map(x=>`<option value="${x}">${x}</option>`).join('')}`;
-  document.getElementById('filterOwner').innerHTML = `<option value="">全部归属</option>${[...oSet].map(x=>`<option value="${x}">${x}</option>`).join('')}`;
+  // 把去重后的数据渲染到下拉框
+  document.getElementById('filterVersion').innerHTML = 
+    `<option value="">全部版本</option>${[...vSet].map(x=>`<option value="${x}">${x}</option>`).join('')}`;
+    
+  document.getElementById('filterRare').innerHTML = 
+    `<option value="">全部稀有度</option>${[...rSet].map(x=>`<option value="${x}">${x}</option>`).join('')}`;
+    
+  document.getElementById('filterOwner').innerHTML = 
+    `<option value="">全部归属</option>${[...oSet].map(x=>`<option value="${x}">${x}</option>`).join('')}`;
 }
 
-// 筛选逻辑
+// ==============================================
+// 筛选核心逻辑：根据用户选择的条件返回符合的卡牌
+// ==============================================
 function getFilterList(){
+  // 1. 获取页面上所有筛选条件的值
   const key = document.getElementById('filterKey').value.toLowerCase();
   const ver = document.getElementById('filterVersion').value;
   const rare = document.getElementById('filterRare').value;
@@ -385,98 +477,152 @@ function getFilterList(){
   const tag = document.getElementById('filterTag').value;
   const stock = document.getElementById('filterStock').value;
 
+  // 2. 过滤数组，只返回满足所有条件的数据
   return db.cards.filter(c=>{
+    // 关键词：匹配编号+名称，不区分大小写
     if(key && !`${c.code}${c.name}`.toLowerCase().includes(key)) return false;
+    // 版本完全匹配
     if(ver && c.version!==ver) return false;
+    // 稀有度完全匹配
     if(rare && c.rare!==rare) return false;
+    // 归属完全匹配
     if(owner && c.owner!==owner) return false;
+    // 标签完全匹配
     if(tag && c.tag!==tag) return false;
+    // 有库存：qty>0
     if(stock==='has' && !c.qty) return false;
+    // 零库存：qty=0
     if(stock==='zero' && c.qty>0) return false;
+    
+    // 所有条件都满足
     return true;
   });
 }
 
-// 统计
+// ==============================================
+// 统计数据计算并渲染到页面顶部
+// ==============================================
 function renderStat(){
-  let totalType=db.cards.length, totalQty=0, totalVal=0, zeroQty=0;
+  let totalType=db.cards.length,  // 总卡牌种类：数组长度
+      totalQty=0,                 // 总库存张数
+      totalVal=0,                 // 库存总市值
+      zeroQty=0;                  // 零库存数量
+
+  // 遍历所有卡牌累加计算
   db.cards.forEach(c=>{
     let q=Number(c.qty)||0;
-    totalQty+=q;
-    totalVal+=q*(c.market||0);
-    if(q===0) zeroQty++;
+    totalQty += q;
+    totalVal += q * (c.market||0);
+    if(q === 0) zeroQty++;
   });
-  document.getElementById('statTotalType').innerText=totalType;
-  document.getElementById('statTotalQty').innerText=totalQty;
-  document.getElementById('statTotalVal').innerText='¥'+totalVal.toFixed(2);
-  document.getElementById('statZeroQty').innerText=zeroQty;
+
+  // 更新到页面显示
+  document.getElementById('statTotalType').innerText = totalType;
+  document.getElementById('statTotalQty').innerText = totalQty;
+  document.getElementById('statTotalVal').innerText = '¥'+totalVal.toFixed(2);
+  document.getElementById('statZeroQty').innerText = zeroQty;
 }
 
+// ==============================================
+// 页面切换：卡牌列表 / 出入库管理
+// ==============================================
 function showPage(id){
+  // 先隐藏所有页面
   document.querySelectorAll('.page').forEach(p=>p.classList.add('d-none'));
+  // 显示目标页面
   document.getElementById(id).classList.remove('d-none');
+  // 只有卡牌页面显示分页栏
   document.getElementById('pagination').style.display = id==='cards'?'flex':'none';
-  if(id==='cards'){currentPage=1;renderCards();}
-  if(id==='stockInOut'){document.getElementById('ioList').innerHTML='';addIoLine();}
+
+  // 切换到卡牌页：刷新列表
+  if(id==='cards'){
+    currentPage=1;
+    renderCards();
+  }
+  // 切换到出入库页：清空行并添加一行默认
+  if(id==='stockInOut'){
+    document.getElementById('ioList').innerHTML='';
+    addIoLine();
+  }
 }
 
-// 标签颜色
+// ==============================================
+// 根据标签文字返回对应的CSS样式类
+// ==============================================
 function getTagCls(t){
-  if(!t)return'';if(t==='自留')return'tag-self';if(t==='可出')return'tag-sale';
-  if(t==='已预定')return'tag-book';if(t==='借出')return'tag-lend';if(t==='待补货')return'tag-wait';return'';
+  if(!t)return '';
+  if(t==='自留')return'tag-self';
+  if(t==='可出')return'tag-sale';
+  if(t==='已预定')return'tag-book';
+  if(t==='借出')return'tag-lend';
+  if(t==='待补货')return'tag-wait';
+  return '';
 }
 
-// ========== 核心：分页渲染 ==========
+// ==============================================
+// 核心函数：分页渲染卡牌列表（三种视图）
+// ==============================================
 function renderCards(){
-  renderStat();
-  fillFilterOption();
-  cachedFilterList = getFilterList();
+  renderStat();                  // 刷新统计
+  fillFilterOption();           // 刷新筛选下拉选项
+  cachedFilterList = getFilterList(); // 获取筛选后的数据
   const total = cachedFilterList.length;
 
-  // 分页计算
+  // 计算分页：总页数、开始下标、结束下标
   const totalPage = Math.ceil(total / PAGE_SIZE);
-  const start = (currentPage-1)*PAGE_SIZE;
+  const start = (currentPage-1) * PAGE_SIZE;
   const end = start + PAGE_SIZE;
-  const showList = cachedFilterList.slice(start, end);
+  const showList = cachedFilterList.slice(start, end); // 当前页要显示的数据
 
   const wrap = document.getElementById('cards');
-  wrap.className = 'page view-'+currentView;
+  wrap.className = 'page view-'+currentView; // 设置视图样式
 
-  if(total===0){
+  // 无数据时显示空提示
+  if(total === 0){
     wrap.innerHTML=`<div class="text-center p-5 bg-light rounded">暂无数据</div>`;
     renderPagination(1,1);
     return;
   }
 
-  // 表格视图
-  if(currentView==='table'){
-    let h=`<div class="table-responsive"><table class="view-table"><thead><tr>
+  // ---------- 如果是表格视图 ----------
+  if(currentView === 'table'){
+    let h = `<div class="table-responsive"><table class="view-table"><thead><tr>
 <th>编号</th><th>名称</th><th>版本</th><th>稀有度</th><th>库存</th><th>市场价</th><th>成本价</th><th>归属</th><th>标签</th><th>备注</th><th>操作</th>
 </tr></thead><tbody>`;
+
+    // 拼接每一行数据
     showList.forEach(c=>{
-      let idx=db.cards.indexOf(c);
-      h+=`<tr>
-<td>${c.code||''}</td><td>${c.name}</td><td>${c.version||''}</td><td>${c.rare||''}</td>
-<td>${c.qty||0}</td><td>¥${(c.market||0).toFixed(2)}</td><td>¥${(c.cost||0).toFixed(2)}</td>
-<td>${c.owner||''}</td><td><span class="tag-label ${getTagCls(c.tag)}">${c.tag||'无'}</span></td>
+      let idx = db.cards.indexOf(c);
+      h += `<tr>
+<td>${c.code||''}</td>
+<td>${c.name}</td>
+<td>${c.version||''}</td>
+<td>${c.rare||''}</td>
+<td>${c.qty||0}</td>
+<td>¥${(c.market||0).toFixed(2)}</td>
+<td>¥${(c.cost||0).toFixed(2)}</td>
+<td>${c.owner||''}</td>
+<td><span class="tag-label ${getTagCls(c.tag)}">${c.tag||'无'}</span></td>
 <td>${c.remark||''}</td>
 <td><button class="btn btn-sm btn-outline-primary" onclick="openEdit(${idx})">编辑</button></td>
 </tr>`;
     });
-    h+=`</tbody></table></div>`;
-    wrap.innerHTML=h;
+    h += `</tbody></table></div>`;
+    wrap.innerHTML = h;
     renderPagination(totalPage, currentPage);
     return;
   }
 
-  // 列表/网格
-  let h='';
+  // ---------- 列表视图 / 网格视图 ----------
+  let h = '';
   showList.forEach(c=>{
-    let idx=db.cards.indexOf(c);
-    h+=`<div class="card-item">
+    let idx = db.cards.indexOf(c);
+    h += `<div class="card-item">
 <div class="row g-2">
-<div class="col-6">编号：${c.code||'无'}</div><div class="col-6">名称：${c.name}</div>
-<div class="col-6">版本：${c.version||'无'}</div><div class="col-6">稀有度：${c.rare||'无'}</div>
+<div class="col-6">编号：${c.code||'无'}</div>
+<div class="col-6">名称：${c.name}</div>
+<div class="col-6">版本：${c.version||'无'}</div>
+<div class="col-6">稀有度：${c.rare||'无'}</div>
 <div class="col-6">库存：<b class="text-primary">${c.qty||0}</b></div>
 <div class="col-6">市场价：¥${(c.market||0).toFixed(2)}</div>
 <div class="col-6">成本价：¥${(c.cost||0).toFixed(2)}</div>
@@ -489,85 +635,126 @@ function renderCards(){
 </div>
 </div>`;
   });
-  wrap.innerHTML=h;
+  wrap.innerHTML = h;
   renderPagination(totalPage, currentPage);
 }
 
-// ========== 分页条渲染 ==========
+// ==============================================
+// 渲染分页条：首页、上页、页码、下页、尾页
+// ==============================================
 function renderPagination(totalPage, curr){
   const bar = document.getElementById('pagination');
-  let h='';
-  if(totalPage<=1){bar.innerHTML='';return;}
+  let h = '';
 
-  if(curr>1) h+=`<button onclick="goPage(1)">首页</button>`;
-  if(curr>1) h+=`<button onclick="goPage(${curr-1})">上页</button>`;
-
-  let start = Math.max(1, curr-2);
-  let end = Math.min(totalPage, curr+2);
-  for(let i=start;i<=end;i++){
-    h+=`<button class="${i===curr?'active':''}" onclick="goPage(${i})">${i}</button>`;
+  // 不足1页，不显示分页
+  if(totalPage <= 1){
+    bar.innerHTML = '';
+    return;
   }
 
-  if(curr<totalPage) h+=`<button onclick="goPage(${curr+1})">下页</button>`;
-  if(curr<totalPage) h+=`<button onclick="goPage(${totalPage})">尾页</button>`;
-  h+=`<span class="pagination-info">第 ${curr}/${totalPage} 页 | 共${cachedFilterList.length}条</span>`;
-  bar.innerHTML=h;
+  // 首页 & 上一页
+  if(curr > 1) h += `<button onclick="goPage(1)">首页</button>`;
+  if(curr > 1) h += `<button onclick="goPage(${curr-1})">上页</button>`;
+
+  // 显示当前页前后各2页的页码
+  let start = Math.max(1, curr-2);
+  let end = Math.min(totalPage, curr+2);
+  for(let i=start; i<=end; i++){
+    h += `<button class="${i===curr?'active':''}" onclick="goPage(${i})">${i}</button>`;
+  }
+
+  // 下一页 & 尾页
+  if(curr < totalPage) h += `<button onclick="goPage(${curr+1})">下页</button>`;
+  if(curr < totalPage) h += `<button onclick="goPage(${totalPage})">尾页</button>`;
+
+  // 分页信息文本
+  h += `<span class="pagination-info">第 ${curr}/${totalPage} 页 | 共${cachedFilterList.length}条</span>`;
+  bar.innerHTML = h;
 }
 
+// ==============================================
+// 跳转到指定页码
+// ==============================================
 function goPage(p){
-  if(p<1)return;
-  currentPage=p;
+  if(p < 1) return;
+  currentPage = p;
   renderCards();
 }
 
-// 编辑
+// ==============================================
+// 打开编辑弹窗，并把卡牌数据填入表单
+// ==============================================
 function openEdit(idx){
-  const c=db.cards[idx];
-  document.getElementById('editIndex').value=idx;
-  document.getElementById('editCode').value=c.code||'';
-  document.getElementById('editName').value=c.name||'';
-  document.getElementById('editVersion').value=c.version||'';
-  document.getElementById('editRare').value=c.rare||'';
-  document.getElementById('editQty').value=c.qty||0;
-  document.getElementById('editMarket').value=c.market||0;
-  document.getElementById('editCost').value=c.cost||0;
-  document.getElementById('editOwner').value=c.owner||'';
-  document.getElementById('editTag').value=c.tag||'';
-  document.getElementById('editRemark').value=c.remark||'';
-  editModal.show();
+  const c = db.cards[idx]; // 获取要编辑的卡牌对象
+  // 赋值到表单
+  document.getElementById('editIndex').value = idx;
+  document.getElementById('editCode').value = c.code || '';
+  document.getElementById('editName').value = c.name || '';
+  document.getElementById('editVersion').value = c.version || '';
+  document.getElementById('editRare').value = c.rare || '';
+  document.getElementById('editQty').value = c.qty || 0;
+  document.getElementById('editMarket').value = c.market || 0;
+  document.getElementById('editCost').value = c.cost || 0;
+  document.getElementById('editOwner').value = c.owner || '';
+  document.getElementById('editTag').value = c.tag || '';
+  document.getElementById('editRemark').value = c.remark || '';
+  
+  editModal.show(); // 显示弹窗
 }
 
+// ==============================================
+// 保存编辑后的卡牌信息
+// ==============================================
 function saveEdit(){
-  const idx=+document.getElementById('editIndex').value;
-  const name=document.getElementById('editName').value.trim();
-  if(!name){alert('名称不能为空');return;}
-  db.cards[idx]={
-    code:document.getElementById('editCode').value.trim(),name,
-    version:document.getElementById('editVersion').value.trim(),
-    rare:document.getElementById('editRare').value.trim(),
-    qty:+document.getElementById('editQty').value||0,
-    market:+document.getElementById('editMarket').value||0,
-    cost:+document.getElementById('editCost').value||0,
-    owner:document.getElementById('editOwner').value.trim(),
-    tag:document.getElementById('editTag').value,
-    remark:document.getElementById('editRemark').value.trim()
+  const idx = +document.getElementById('editIndex').value;
+  const name = document.getElementById('editName').value.trim();
+  
+  // 校验：名称不能为空
+  if(!name){
+    alert('名称不能为空');
+    return;
+  }
+
+  // 构造新的卡牌对象，覆盖原数据
+  db.cards[idx] = {
+    code: document.getElementById('editCode').value.trim(),
+    name: name,
+    version: document.getElementById('editVersion').value.trim(),
+    rare: document.getElementById('editRare').value.trim(),
+    qty: +document.getElementById('editQty').value || 0,
+    market: +document.getElementById('editMarket').value || 0,
+    cost: +document.getElementById('editCost').value || 0,
+    owner: document.getElementById('editOwner').value.trim(),
+    tag: document.getElementById('editTag').value,
+    remark: document.getElementById('editRemark').value.trim()
   };
+
+  saveDB();             // 保存到本地
+  cacheFilters = null;  // 清空筛选缓存
+  editModal.hide();     // 关闭弹窗
+  renderCards();        // 刷新列表
+}
+
+// ==============================================
+// 删除单张卡牌
+// ==============================================
+function delOneCard(){
+  if(!confirm('确定删除？')) return;
+  // 根据下标删除数组中的一项
+  db.cards.splice(+document.getElementById('editIndex').value, 1);
   saveDB();
-  cacheFilters=null;
+  cacheFilters = null;
   editModal.hide();
   renderCards();
 }
 
-function delOneCard(){
-  if(!confirm('确定删除？'))return;
-  db.cards.splice(+document.getElementById('editIndex').value,1);
-  saveDB();cacheFilters=null;editModal.hide();renderCards();
-}
-
-// 出入库
+// ==============================================
+// 出入库：添加一行出入库记录
+// ==============================================
 function addIoLine(){
-  const d=document.createElement('div');d.className='in-row';
-  d.innerHTML=`
+  const d = document.createElement('div');
+  d.className = 'in-row';
+  d.innerHTML = `
 <select class="form-select form-select-sm io-type"><option>入库</option><option>出库</option></select>
 <div class="position-relative">
 <input class="form-control form-control-sm io-key" oninput="searchCard(this)" placeholder="搜索">
@@ -578,74 +765,251 @@ function addIoLine(){
 <input class="form-control form-control-sm io-qty" type="number" value=1 min=1>
 <input class="form-control form-control-sm io-price" value=0>
 <button class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">×</button>`;
+
   document.getElementById('ioList').appendChild(d);
 }
 
+// ==============================================
+// 出入库搜索卡牌：实时匹配并显示下拉建议
+// ==============================================
 function searchCard(i){
-  const v=i.value.toLowerCase().replace(/\s/g,'');
-  const r=i.closest('.in-row'),s=r.querySelector('.io-sug');
-  if(!v){s.classList.add('d-none');r.querySelector('.io-name').value='';return;}
-  const arr=db.cards.filter(x=>`${x.code}${x.name}`.toLowerCase().includes(v));
-  s.innerHTML='';arr.forEach(c=>{
-    const t=document.createElement('div');t.className='autocomplete-item';
-    t.innerText=`${c.code}|${c.name}|库存:${c.qty}`;
-    t.onclick=()=>{i.value=c.code||c.name;r.querySelector('.io-name').value=c.name;r.querySelector('.io-stock').value=c.qty;s.classList.add('d-none');};
-    s.appendChild(t);
+  const v = i.value.toLowerCase().replace(/\s/g,'');
+  const row = i.closest('.in-row');
+  const sugBox = row.querySelector('.io-sug');
+
+  // 输入为空，隐藏建议框
+  if(!v){
+    sugBox.classList.add('d-none');
+    row.querySelector('.io-name').value = '';
+    return;
+  }
+
+  // 匹配编号或名称
+  const arr = db.cards.filter(x=>`${x.code}${x.name}`.toLowerCase().includes(v));
+  sugBox.innerHTML = '';
+
+  // 生成下拉选项
+  arr.forEach(c=>{
+    const item = document.createElement('div');
+    item.className = 'autocomplete-item';
+    item.innerText = `${c.code}|${c.name}|库存:${c.qty}`;
+    
+    // 点击选项自动填充
+    item.onclick = ()=>{
+      i.value = c.code || c.name;
+      row.querySelector('.io-name').value = c.name;
+      row.querySelector('.io-stock').value = c.qty;
+      sugBox.classList.add('d-none');
+    };
+    sugBox.appendChild(item);
   });
-  s.classList.toggle('d-none',!arr.length);
+
+  // 有结果就显示，没结果就隐藏
+  sugBox.classList.toggle('d-none', !arr.length);
 }
 
+// ==============================================
+// 提交出入库：批量增加或减少库存
+// ==============================================
 function submitIo(){
-  const lines=document.querySelectorAll('.in-row');
+  // 获取所有出入库行
+  const lines = document.querySelectorAll('.in-row');
+
   for(const el of lines){
-    const type=el.querySelector('.io-type').value;
-    const name=el.querySelector('.io-name').value.trim();
-    const q=+el.querySelector('.io-qty').value||0;
-    if(!name||!q)continue;
-    const i=db.cards.findIndex(x=>x.name===name);
-    if(i===-1){
-      if(type==='入库')db.cards.push({code:'',name,version:'',rare:'',qty:q,market:0,cost:0,owner:'',tag:'',remark:''});
-      else{alert(name+'不存在，无法出库');return;}
+    const type = el.querySelector('.io-type').value;    // 入库/出库
+    const name = el.querySelector('.io-name').value.trim();
+    const qty = +el.querySelector('.io-qty').value || 0;
+
+    // 跳过空行
+    if(!name || !qty) continue;
+
+    // 查找卡牌是否已存在
+    const index = db.cards.findIndex(x=>x.name === name);
+
+    if(index === -1){
+      // 不存在：只能入库新增
+      if(type === '入库'){
+        db.cards.push({
+          code:'',name,version:'',rare:'',
+          qty:qty,market:0,cost:0,owner:'',tag:'',remark:''
+        });
+      }else{
+        alert(name + '不存在，无法出库');
+        return;
+      }
     }else{
-      if(type==='入库')db.cards[i].qty+=q;
-      else{
-        if(db.cards[i].qty<q){alert(name+'库存不足');return;}
-        db.cards[i].qty-=q;
+      // 已存在：执行入库+ 或 出库-
+      if(type === '入库'){
+        db.cards[index].qty += qty;
+      }else{
+        // 出库检查库存是否足够
+        if(db.cards[index].qty < qty){
+          alert(name + '库存不足');
+          return;
+        }
+        db.cards[index].qty -= qty;
       }
     }
   }
-  saveDB();cacheFilters=null;alert('完成');showPage('cards');
+
+  saveDB();
+  cacheFilters = null;
+  alert('出入库完成');
+  showPage('cards');
 }
 
-// Excel
-function importExcelMode(m){nowImportMode=m;importExcel();}
+// ==============================================
+// Excel 功能：设置导入模式
+// ==============================================
+function importExcelMode(m){
+  nowImportMode = m;
+  importExcel();
+}
+
+// ==============================================
+// 下载Excel导入模板
+// ==============================================
 function downloadTemplate(){
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet([{编号:'',名称:'',版本:'',稀有度:'',库存:0,市场价:0,成本价:0,归属:'',标签:'',备注:''}]),'Sheet1');
-  XLSX.writeFile(wb,'卡牌模板.xlsx');
+  const wb = XLSX.utils.book_new();
+  // 模板表头
+  const template = [{
+    编号:'',名称:'',版本:'',稀有度:'',库存:0,
+    市场价:0,成本价:0,归属:'',标签:'',备注:''
+  }];
+  const sheet = XLSX.utils.json_to_sheet(template);
+  XLSX.utils.book_append_sheet(wb, sheet, 'Sheet1');
+  XLSX.writeFile(wb, '卡牌模板.xlsx');
 }
+
+// ==============================================
+// 导入Excel文件
+// ==============================================
 function importExcel(){
-  const i=document.createElement('input');i.type='file';i.accept='.xlsx';
-  i.onchange=e=>{const f=new FileReader();f.onload=ev=>{
-    const arr=XLSX.utils.sheet_to_json(XLSX.read(ev.target.result,{type:'array'}).Sheets.Sheet1);
-    if(nowImportMode==='cover')db.cards=[];
-    arr.forEach(r=>{const n=(r.名称||'').trim();if(!n)return;
-      const e=db.cards.findIndex(x=>x.name===n);
-      const d={code:(r.编号||'').trim(),name:n,version:(r.版本||'').trim(),rare:(r.稀有度||'').trim(),qty:Number(r.库存)||0,market:Number(r.市场价)||0,cost:Number(r.成本价)||0,owner:(r.归属||'').trim(),tag:(r.标签||'').trim(),remark:(r.备注||'').trim()};
-      e>-1?db.cards[e]=d:db.cards.push(d);
-    });
-    saveDB();cacheFilters=null;alert('导入成功');showPage('cards');
-  };f.readAsArrayBuffer(e.target.files[0]);};i.click();
+  // 创建文件选择框
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.xlsx';
+
+  input.onchange = e=>{
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      // 读取Excel数据
+      const data = ev.target.result;
+      const workbook = XLSX.read(data, {type:'array'});
+      const arr = XLSX.utils.sheet_to_json(workbook.Sheets.Sheet1);
+
+      // 覆盖模式：先清空原有数据
+      if(nowImportMode === 'cover'){
+        db.cards = [];
+      }
+
+      // 遍历导入每一行
+      arr.forEach(row=>{
+        const name = (row.名称 || '').trim();
+        if(!name) return;
+
+        // 构造卡牌对象
+        const card = {
+          code:(row.编号 || '').trim(),
+          name:name,
+          version:(row.版本 || '').trim(),
+          rare:(row.稀有度 || '').trim(),
+          qty:Number(row.库存) || 0,
+          market:Number(row.市场价) || 0,
+          cost:Number(row.成本价) || 0,
+          owner:(row.归属 || '').trim(),
+          tag:(row.标签 || '').trim(),
+          remark:(row.备注 || '').trim()
+        };
+
+        // 查找是否已存在
+        const existIndex = db.cards.findIndex(x=>x.name === name);
+        if(existIndex > -1){
+          // 已存在：覆盖更新
+          db.cards[existIndex] = card;
+        }else{
+          // 不存在：新增
+          db.cards.push(card);
+        }
+      });
+
+      saveDB();
+      cacheFilters = null;
+      alert('导入成功');
+      showPage('cards');
+    };
+    reader.readAsArrayBuffer(e.target.files[0]);
+  };
+  input.click();
 }
-function exportExcel(){if(!db.cards.length){alert('无数据');return;}XLSX.writeFile(XLSX.utils.book_new(XLSX.utils.json_to_sheet(db.cards)),'卡牌库存.xlsx');}
 
-// 备份
-function exportJsonBackup(){const b=new Blob([JSON.stringify(db.cards,null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='TCG备份.json';a.click();URL.revokeObjectURL(a.href);}
-function importJsonBackup(){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=e=>{const f=new FileReader();f.onload=ev=>{try{db.cards=JSON.parse(ev.target.result);saveDB();cacheFilters=null;alert('恢复成功');renderCards();}catch(e){alert('格式错误');}};f.readAsText(e.target.files[0]);};i.click();}
+// ==============================================
+// 导出所有数据到Excel
+// ==============================================
+function exportExcel(){
+  if(!db.cards.length){
+    alert('无数据可导出');
+    return;
+  }
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet(db.cards);
+  XLSX.utils.book_append_sheet(wb, ws, '卡牌库存');
+  XLSX.writeFile(wb, '卡牌库存.xlsx');
+}
 
-function clearAll(){if(!confirm('确定清空？'))return;db.cards=[];saveDB();cacheFilters=null;showPage('cards');}
+// ==============================================
+// JSON备份导出
+// ==============================================
+function exportJsonBackup(){
+  const blob = new Blob([JSON.stringify(db.cards, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'TCG备份.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
-// 初始化
+// ==============================================
+// JSON备份恢复
+// ==============================================
+function importJsonBackup(){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+
+  input.onchange = e=>{
+    const reader = new FileReader();
+    reader.onload = ev=>{
+      try{
+        // 解析JSON并覆盖数据
+        db.cards = JSON.parse(ev.target.result);
+        saveDB();
+        cacheFilters = null;
+        alert('恢复成功');
+        renderCards();
+      }catch(e){
+        alert('备份文件格式错误');
+      }
+    };
+    reader.readAsText(e.target.files[0]);
+  };
+  input.click();
+}
+
+// ==============================================
+// 清空所有数据
+// ==============================================
+function clearAll(){
+  if(!confirm('确定要清空所有数据吗？此操作不可恢复！')) return;
+  db.cards = [];
+  saveDB();
+  cacheFilters = null;
+  showPage('cards');
+}
+
+// ==============================================
+// 系统初始化：默认显示卡牌列表页
+// ==============================================
 showPage('cards');
 </script>
 </body>
