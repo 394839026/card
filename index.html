@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TCG共用库存管理系统-统一出入库</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+ <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
 :root { --primary: #4361ee; --card-bg: #fff; --body-bg: #f8f9fc; --text: #21252d; --auto-bg:#fff; --auto-hover:#e9ecef; }
@@ -171,13 +171,13 @@ function fillIoLine(row,card){row.querySelector('.io-name').value=card.name;row.
 
 function doStockInOut(){const lines=document.querySelectorAll('#inOutList .in-row');let ok=true;lines.forEach(l=>{const t=l.querySelector('.io-type').value;const k=l.querySelector('.io-key').value.trim().toLowerCase();const n=l.querySelector('.io-name').value.trim();const q=parseInt(l.querySelector('.io-qty').value)||0;const p=parseFloat(l.querySelector('.io-price').value)||0;if(!n||q<=0){ok=false;return;}const card=db.cards.find(x=>{const c=(x.code||'').toLowerCase(),n=x.name.toLowerCase();return c===k||n===k||c.includes(k)||n.includes(k);});if(!card){if(t==='买入'){const nc={code:'',name:n,set:'',rarity:'',qty:q,price:0,actual:p,ownerType:'自有'};db.cards.push(nc);db.trades.push({cardCode:'',cardName:n,type:'买入',money:(q*p).toFixed(2),date:new Date().toLocaleString(),user:currentUser});}else{alert(`卡牌【${n}】不存在，无法卖出`);ok=false;}return;}if(t==='卖出'){if(card.qty<q){alert(`【${card.name}】库存不足！当前：${card.qty}`);ok=false;return;}card.qty-=q;}else{card.qty+=q;card.actual=p;}db.trades.push({cardCode:card.code,cardName:card.name,type:t,money:(q*p).toFixed(2),date:new Date().toLocaleString(),user:currentUser});});if(!ok)return;saveGlobalData();document.getElementById('inOutList').innerHTML='';alert('出入库完成！');showPage('cards');}
 
-// ==== Excel ====
+// ==== Excel 导入导出（彻底修复版）====
 const cols=[{key:'code',title:'编号'},{key:'name',title:'名称'},{key:'set',title:'版本'},{key:'rarity',title:'稀有度'},{key:'qty',title:'库存'},{key:'price',title:'市场价'},{key:'actual',title:'成本价'},{key:'ownerType',title:'归属'}];
 function downloadEmptyTemplate(){const wb=XLSX.utils.book_new();const ws=XLSX.utils.json_to_sheet([{}]);XLSX.utils.book_append_sheet(wb,ws,'模板');XLSX.writeFile(wb,'TCG空白模板.xlsx');}
 function exportExcel(){const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(db.cards.map(i=>{let r={};cols.forEach(c=>r[c.title]=i[c.key]??'');return r;})),'库存');XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(db.trades),'交易');XLSX.writeFile(wb,'TCG库存数据.xlsx');}
 let importCoverMode=false;
 function openImportSelect(){importCoverMode=confirm('确定=覆盖｜取消=追加');importExcel();}
-function importExcel(){const i=document.createElement('input');i.type='file';i.accept='.xlsx';i.onchange=e=>{const r=new FileReader();r.onload=ev=>{const wb=XLSX.read(ev.target.result,{type:'array'});const d=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);if(importCoverMode)db.cards=[];d.forEach(row=>{const n=(row['名称']||'').trim();if(!n)return;const c={code:row['编号']||'',name:n,set:row['版本']||'',rarity:row['稀有度']||'',qty:Number(row['库存'])||0,price:Number(row['市场价'])||0,actual:Number(row['成本价'])||0,ownerType:row['归属']||'自有'};const ei=db.cards.findIndex(x=>x.code===c.code||(x.name===n&&x.set===c.set));if(ei>=0)db.cards[ei]=c;else db.cards.push(c);});saveGlobalData();alert('导入成功');loadCards();};r.readAsArrayBuffer(e.target.files[0]);};i.click();}
+function importExcel(){const i=document.createElement('input');i.type='file';i.accept='.xlsx';i.onchange=e=>{const r=new FileReader();r.onload=ev=>{const wb=XLSX.read(ev.target.result,{type:'array'});// 修复1：强制读 Sheet1const ws=wb.Sheets['Sheet1'];if(!ws){alert('必须使用 Sheet1 作为工作表名！');return;}const d=XLSX.utils.sheet_to_json(ws);if(importCoverMode)db.cards=[];d.forEach(row=>{// 修复2：严格匹配表头const name=(row['名称']||'').trim();if(!name)return;const c={code:row['编号']||'',name:n,set:row['版本']||'',rarity:row['稀有度']||'',qty:Number(row['库存'])||0,price:Number(row['市场价'])||0,actual:Number(row['成本价'])||0,ownerType:row['归属']||'自有'};const ei=db.cards.findIndex(x=>x.code===c.code||(x.name===n&&x.set===c.set));if(ei>=0)db.cards[ei]=c;else db.cards.push(c);});saveGlobalData();alert('导入成功！');// 修复3：导入后强制刷新卡牌列表loadCards();};r.readAsArrayBuffer(e.target.files[0]);};i.click();}
 </script>
 </body>
 </html>
