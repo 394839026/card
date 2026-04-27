@@ -7,7 +7,7 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
-.in-row{display:grid;grid-template-columns:110px 1fr 100px 90px 90px 90px 40px;gap:6px;margin-bottom:8px;}
+.in-row{display:grid;grid-template-columns:110px 1fr 100px 90px 90px 90px 40px;gap:6px;margin-bottom:8px;align-items:center;}
 .auto-box{position:absolute;background:#fff;border:1px solid #ccc;max-height:200px;overflow:auto;z-index:9999;width:100%;}
 .autocomplete-item{padding:6px;cursor:pointer;}
 .autocomplete-item:hover{background:#eee;}
@@ -16,7 +16,7 @@
 </head>
 <body class="p-3">
 
-<div class="card p-3">
+<div class="card p-3 shadow-sm">
   <h5 class="mb-3">TCG卡牌库存管理（全新纯净版）</h5>
   <div class="d-flex gap-2 flex-wrap mb-3">
     <button class="btn btn-primary btn-sm" onclick="showPage('cards')">卡牌列表</button>
@@ -58,10 +58,15 @@ function showPage(id){
 }
 
 function renderCards(){
+  if(db.cards.length === 0){
+    document.getElementById('cards').innerHTML = `<div class="text-muted text-center p-3">暂无卡牌数据</div>`;
+    return;
+  }
   let html = '';
-  db.cards.forEach(c=>{
+  db.cards.forEach((c, index)=>{
     html += `<div class="border p-2 mb-2">
-      <div>编号：${c.code||''}</div>
+      <div>序号：${index+1}</div>
+      <div>编号：${c.code||'无'}</div>
       <div>名称：${c.name}</div>
       <div>库存：${c.qty}</div>
     </div>`;
@@ -98,6 +103,8 @@ function searchCard(input){
   let sug = row.querySelector('.io-sug');
   if(!val){
     sug.classList.add('d-none');
+    row.querySelector('.io-name').value = '';
+    row.querySelector('.io-stock').value = '';
     return;
   }
   let arr = db.cards.filter(x=>{
@@ -116,7 +123,7 @@ function searchCard(input){
     item.className = 'autocomplete-item';
     item.innerText = `${c.code} | ${c.name} | 库存:${c.qty}`;
     item.onclick = ()=>{
-      input.value = c.name;
+      input.value = c.code || c.name;
       row.querySelector('.io-name').value = c.name;
       row.querySelector('.io-stock').value = c.qty;
       sug.classList.add('d-none');
@@ -127,9 +134,10 @@ function searchCard(input){
 
 function submitIo(){
   let lines = document.querySelectorAll('.in-row');
+  let hasError = false;
   for(let el of lines){
     let type = el.querySelector('.io-type').value;
-    let name = el.querySelector('.io-name').value;
+    let name = el.querySelector('.io-name').value.trim();
     let qty = parseInt(el.querySelector('.io-qty').value) || 0;
     if(!name || qty<=0) continue;
 
@@ -139,7 +147,8 @@ function submitIo(){
         db.cards.push({code:'',name:name,qty:qty});
       }else{
         alert(`【${name}】不存在，无法出库`);
-        return;
+        hasError = true;
+        break;
       }
     }else{
       if(type==='入库'){
@@ -147,12 +156,14 @@ function submitIo(){
       }else{
         if(db.cards[idx].qty < qty){
           alert(`【${name}】库存不足`);
-          return;
+          hasError = true;
+          break;
         }
         db.cards[idx].qty -= qty;
       }
     }
   }
+  if(hasError) return;
   saveDB();
   alert('操作完成');
   showPage('cards');
@@ -178,17 +189,23 @@ function importExcel(){
     r.onload = ev=>{
       let wb = XLSX.read(ev.target.result, {type:'array'});
       let arr = XLSX.utils.sheet_to_json(wb.Sheets.Sheet1);
+      
       arr.forEach(row=>{
         let name = (row['名称']||'').toString().trim();
         if(!name) return;
-        db.cards.push({
-          code:(row['编号']||'').toString().trim(),
-          name:name,
-          qty:Number(row['库存'])||0
-        });
+        let code = (row['编号']||'').toString().trim();
+        let qty = Number(row['库存'])||0;
+        
+        let exist = db.cards.findIndex(x=>x.name === name);
+        if(exist !== -1){
+          db.cards[exist].code = code;
+          db.cards[exist].qty = qty;
+        }else{
+          db.cards.push({code,name,qty});
+        }
       });
       saveDB();
-      alert('导入成功');
+      alert('导入成功（已自动去重更新）');
       showPage('cards');
     };
     r.readAsArrayBuffer(f);
@@ -197,6 +214,10 @@ function importExcel(){
 }
 
 function exportExcel(){
+  if(db.cards.length === 0){
+    alert('无数据可导出');
+    return;
+  }
   let wb = XLSX.utils.book_new();
   let ws = XLSX.utils.json_to_sheet(db.cards);
   XLSX.utils.book_append_sheet(wb, ws, '库存');
